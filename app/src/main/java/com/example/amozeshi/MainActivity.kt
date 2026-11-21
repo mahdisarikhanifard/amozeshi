@@ -17,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -52,6 +54,8 @@ class MainActivity: ComponentActivity() {
     var snackbar by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf(prefs.getString("api_key","") ?: "") }
     var editStudent by remember { mutableStateOf<Student?>(null) }
+    val scope=rememberCoroutineScope()
+    var lessonLoading by remember { mutableStateOf(false) }
     fun persist() { prefs.edit().putString("students",saveStudents(students)).putString("columns",saveColumns(columns)).apply() }
     val speechLauncher=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val spoken=result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty()
@@ -98,9 +102,17 @@ class MainActivity: ComponentActivity() {
                 4 -> {
                     Text("دستیار هوشمند طرح درس",style=MaterialTheme.typography.headlineSmall)
                     OutlinedTextField(lessonRequest,{lessonRequest=it},label={Text("مثلاً طرح درس درس چهارم تاریخ پایه نهم")},modifier=Modifier.fillMaxWidth(),minLines=2)
-                    Button(onClick={lessonOutput=lessonTemplate(lessonRequest); val q=java.net.URLEncoder.encode(lessonRequest+" کتاب درسی طرح درس نکات مهم","UTF-8");ctx.startActivity(Intent(Intent.ACTION_VIEW,android.net.Uri.parse("https://www.google.com/search?q=$q")))},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Search,"");Text("جستجوی منابع و ساخت قالب")}
+                    Button(onClick={
+                        lessonLoading=true
+                        scope.launch {
+                            lessonOutput=if(apiKey.isNotBlank()) generateLessonWithGemini(apiKey,lessonRequest) else lessonTemplate(lessonRequest)+"\n\nبرای تولید طرح درس مبتنی بر جستجوی وب، کلید Gemini API را در تنظیمات وارد کنید."
+                            lessonLoading=false
+                        }
+                        val q=java.net.URLEncoder.encode(lessonRequest+" کتاب درسی طرح درس نکات مهم","UTF-8")
+                        ctx.startActivity(Intent(Intent.ACTION_VIEW,android.net.Uri.parse("https://www.google.com/search?q=$q")))
+                    },modifier=Modifier.fillMaxWidth(),enabled=!lessonLoading){Icon(Icons.Default.Search,"");Text(if(lessonLoading)"در حال تهیه طرح درس..." else "جستجوی منابع و تهیه طرح درس")}
                     if(lessonOutput.isNotBlank()) Card { Column(Modifier.padding(12.dp)){Text(lessonOutput);Button(onClick={ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,lessonOutput)},"اشتراک طرح درس"))}){Text("اشتراک‌گذاری")} } }
-                    Text("برای تولید محتوای هوشمند و تحلیل منابع، کلید API را در تنظیمات وارد کنید. جستجوی وب در مرورگر باز می‌شود؛ این نسخه هنوز نتایج وب را به‌صورت خودکار وارد برنامه نمی‌کند.",style=MaterialTheme.typography.bodySmall)
+                    Text("با کلید Gemini API، طرح درس به‌صورت خودکار تولید می‌شود و ابزار جستجوی وب مدل برای یافتن منابع فعال می‌شود. مرورگر نیز برای جستجوی تکمیلی باز خواهد شد.",style=MaterialTheme.typography.bodySmall)
                 }
                 5 -> {
                     Text("تنظیمات",style=MaterialTheme.typography.headlineSmall)
@@ -146,6 +158,23 @@ fun parseVoice(text:String):Pair<String,Float>?{
     val score=nums.last()
     val name=text.replace(Regex("""\d+(?:[٫.]\d+)?"""),"").replace(Regex("""(نمره|امتحان|آزمون|درس|از|برای)"""),"").trim()
     return name.takeIf{it.isNotBlank()}?.let{it to score}
+}
+suspend fun generateLessonWithGemini(apiKey:String,request:String):String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    try {
+        val url=java.net.URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key="+java.net.URLEncoder.encode(apiKey,"UTF-8"))
+        val conn=url.openConnection() as java.net.HttpURLConnection
+        conn.requestMethod="POST";conn.connectTimeout=30000;conn.readTimeout=60000;conn.doOutput=true
+        conn.setRequestProperty("Content-Type","application/json")
+        val prompt="تو دستیار حرفه‌ای معلم فارسی‌زبان هستی. درخواست معلم: $request. اگر پایه یا عنوان درس مبهم/ناسازگار است، ابتدا این ابهام را در پاسخ مشخص کن. طرح درس شامل مشخصات، اهداف کلی و رفتاری، پیش‌نیاز، وسایل، مراحل تدریس و زمان، فعالیت معلم و دانش‌آموز، پرسش‌های ارزشیابی، تکلیف، نکات مهم کتاب و منابع باشد. مطالب factual را با جستجوی وب بررسی کن و منابع را ذکر کن. پاسخ فارسی و ساختاریافته باشد."
+        val body=JSONObject().put("contents",JSONArray().put(JSONObject().put("parts",JSONArray().put(JSONObject().put("text",prompt)))))
+            .put("tools",JSONArray().put(JSONObject().put("google_search",JSONObject())))
+        conn.outputStream.use{it.write(body.toString().toByteArray(Charsets.UTF_8))}
+        val stream=if(conn.responseCode in 200..299)conn.inputStream else conn.errorStream
+        val raw=stream.bufferedReader().use{it.readText()}
+        if(conn.responseCode !in 200..299) "خطای سرویس هوش مصنوعی: $raw" else {
+            val json=JSONObject(raw);json.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+        }
+    } catch(e:Exception) { "اتصال به هوش مصنوعی ناموفق بود: ${e.message}\n\n"+lessonTemplate(request) }
 }
 fun lessonTemplate(req:String)= """طرح درس پیشنهادی
 درخواست: $req
