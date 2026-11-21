@@ -192,14 +192,14 @@ class MainActivity: ComponentActivity() {
                 val day=attendance.optJSONObject(attendanceDate)?:JSONObject()
                 Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Row(Modifier.fillMaxWidth().padding(14.dp),horizontalArrangement=Arrangement.SpaceBetween){Text("حاضر: "+roster.count{day.optString(it.name)=="present"});Text("غایب: "+roster.count{day.optString(it.name)=="absent"})}}
                 roster.forEach{st->Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically){Text(st.name,Modifier.weight(1f));FilterChip(selected=day.optString(st.name)=="present",onClick={day.put(st.name,"present");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply()},label={Text("حاضر")});Spacer(Modifier.width(6.dp));FilterChip(selected=day.optString(st.name)=="absent",onClick={day.put(st.name,"absent");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply()},label={Text("غایب")})}}
-                Button(onClick={val report=roster.joinToString("\\n"){it.name+" : "+when(day.optString(it.name)){"present"->"حاضر";"absent"->"غایب";else->"ثبت نشده"}};ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_SUBJECT,"حضور و غیاب $attendanceDate");putExtra(Intent.EXTRA_TEXT,report)},"اشتراک گزارش حضور"))},modifier=Modifier.fillMaxWidth()){Text("خروجی حضور و غیاب")}
+                Button(onClick={ val report=roster.joinToString("\\n"){it.name+" : "+when(day.optString(it.name)){"present"->"حاضر";"absent"->"غایب";else->"ثبت نشده"}}; ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_SUBJECT,"حضور و غیاب $attendanceDate");putExtra(Intent.EXTRA_TEXT,report)},"اشتراک گزارش حضور")) },modifier=Modifier.fillMaxWidth()){ Text("خروجی حضور و غیاب") }
             }
             7 -> {
                 Text("برنامه هفتگی",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
                 Text("روز، ساعت، کلاس و درس را وارد کنید.")
                 OutlinedTextField(timetableEdit,{timetableEdit=it},modifier=Modifier.fillMaxWidth(),minLines=8,label={Text("شنبه تا پنجشنبه · ساعت · کلاس · درس")})
                 Button(onClick={timetable=timetableEdit;prefs.edit().putString("timetable",timetable).apply();snackbar="برنامه هفتگی ذخیره شد."},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Save,"");Text("ذخیره برنامه")}
-                OutlinedButton(onClick={ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,timetable)},"اشتراک برنامه هفتگی"))},modifier=Modifier.fillMaxWidth()){Text("اشتراک برنامه")}
+                OutlinedButton(onClick={ ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,timetable)},"اشتراک برنامه هفتگی")) },modifier=Modifier.fillMaxWidth()){ Text("اشتراک برنامه") }
             }
             if(snackbar.isNotBlank()) Text(snackbar,color=MaterialTheme.colorScheme.primary)
         }
