@@ -287,7 +287,7 @@ suspend fun generateLessonWithGroq(apiKey:String,request:String):String = kotlin
         conn.setRequestProperty("Authorization","Bearer ${apiKey.trim()}")
         val prompt="تو دستیار حرفه‌ای معلم فارسی‌زبان هستی. درخواست معلم: $request. اگر پایه یا عنوان درس مبهم/ناسازگار است، ابتدا ابهام را مشخص کن. طرح درس شامل مشخصات، اهداف کلی و رفتاری، پیش‌نیاز، وسایل، مراحل تدریس و زمان، فعالیت معلم و دانش‌آموز، پرسش‌های ارزشیابی، تکلیف، نکات مهم کتاب و منابع پیشنهادی باشد. پاسخ فارسی، دقیق، ساختاریافته و کاربردی باشد. درباره منابع یا اطلاعاتی که واقعاً بررسی نکرده‌ای ادعای بررسی نکن."
         val body=JSONObject()
-            .put("model","llama-3.3-70b-versatile")
+            .put("model","openai/gpt-oss-120b")
             .put("messages",JSONArray()
                 .put(JSONObject().put("role","system").put("content","دستیار تخصصی طراحی آموزشی و طرح درس."))
                 .put(JSONObject().put("role","user").put("content",prompt)))
