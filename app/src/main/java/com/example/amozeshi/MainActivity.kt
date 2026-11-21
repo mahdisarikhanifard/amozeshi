@@ -51,6 +51,7 @@ class MainActivity: ComponentActivity() {
     var lessonRequest by remember { mutableStateOf("") }
     var lessonOutput by remember { mutableStateOf("") }
     var speechText by remember { mutableStateOf("") }
+    var speechColumn by remember { mutableStateOf("") }
     var snackbar by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf(prefs.getString("api_key","") ?: "") }
     var editStudent by remember { mutableStateOf<Student?>(null) }
@@ -91,8 +92,14 @@ class MainActivity: ComponentActivity() {
                     Text("دفتر نمرات",style=MaterialTheme.typography.headlineSmall)
                     OutlinedTextField(selectedClass,{selectedClass=it},label={Text("کلاس")},modifier=Modifier.fillMaxWidth())
                     OutlinedTextField(selectedSubject,{selectedSubject=it},label={Text("درس")},modifier=Modifier.fillMaxWidth())
+                    if(speechColumn.isBlank() && columns.isNotEmpty()) speechColumn=columns.first().name
+                    var columnExpanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(expanded=columnExpanded,onExpandedChange={columnExpanded=it}) {
+                        OutlinedTextField(value=speechColumn,onValueChange={},readOnly=true,label={Text("ستون نمره")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(columnExpanded)},modifier=Modifier.fillMaxWidth().menuAnchor())
+                        ExposedDropdownMenu(expanded=columnExpanded,onDismissRequest={columnExpanded=false}) { columns.forEach{col->DropdownMenuItem(text={Text(col.name)},onClick={speechColumn=col.name;columnExpanded=false})} }
+                    }
                     Button(onClick={startSpeech},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Mic,"");Text("ثبت نمره با صوت")}
-                    if(speechText.isNotBlank()) Card { Column(Modifier.padding(12.dp)){Text("گفتار تشخیص داده شده:");Text(speechText); Button(onClick={val parsed=parseVoice(speechText); if(parsed!=null){students=students.map{if(it.name.contains(parsed.first,true)&&it.clazz==selectedClass&&it.subject==selectedSubject)it.copy(scores=it.scores+(columns.firstOrNull()?.name.orEmpty() to parsed.second))else it};persist();snackbar="نمره ثبت شد (در صورت تطبیق نام)."}else snackbar="نام و نمره را دستی وارد کنید.";speechText=""}){Text("تلاش برای ثبت")}} }
+                    if(speechText.isNotBlank()) Card { Column(Modifier.padding(12.dp)){Text("گفتار تشخیص داده شده:");Text(speechText); Button(onClick={val parsed=parseVoice(speechText); if(parsed!=null){students=students.map{if(it.name.contains(parsed.first,true)&&it.clazz==selectedClass&&it.subject==selectedSubject)it.copy(scores=it.scores+(speechColumn to parsed.second))else it};persist();snackbar="نمره ثبت شد (در صورت تطبیق نام)."}else snackbar="نام و نمره را دستی وارد کنید.";speechText=""}){Text("تلاش برای ثبت")}} }
                     students.filter{it.clazz==selectedClass&&it.subject==selectedSubject}.forEach { s -> Card { Column(Modifier.padding(12.dp)){Text(s.name,fontWeight=FontWeight.Bold);columns.forEach { c -> var value by remember(s.name,c.name){mutableStateOf(s.scores[c.name]?.toString().orEmpty())}; OutlinedTextField(value,{value=it;val n=it.toFloatOrNull();if(n!=null){students=students.map{st->if(st==s)st.copy(scores=st.scores+(c.name to n))else st};persist()}},label={Text("${c.name} (از ${c.max})")},modifier=Modifier.fillMaxWidth())};Text("میانگین: ${average(s.scores).let{if(it==null)"—" else "%.2f".format(it)}}") } } }
                 }
                 3 -> {
