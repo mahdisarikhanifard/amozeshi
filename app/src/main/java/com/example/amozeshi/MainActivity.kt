@@ -183,7 +183,6 @@ class MainActivity: ComponentActivity() {
                     Text("پشتیبان شامل فهرست دانش‌آموزان، کلاس‌ها، درس‌ها و نمرات است. فایل/متن خروجی را در فضای امن نگه دارید.",style=MaterialTheme.typography.bodySmall)
                     Text("اطلاعات دانش‌آموزان روی همین دستگاه ذخیره می‌شود.")
                 }
-            }
             6 -> {
                 Text("حضور و غیاب",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
                 OutlinedTextField(attendanceDate,{attendanceDate=it},label={Text("تاریخ (YYYY-MM-DD)")},modifier=Modifier.fillMaxWidth())
@@ -230,6 +229,7 @@ class MainActivity: ComponentActivity() {
                 ) {
                     Text("اشتراک برنامه")
                 }
+            }
             }
             if(snackbar.isNotBlank()) Text(snackbar,color=MaterialTheme.colorScheme.primary)
         }
