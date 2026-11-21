@@ -82,30 +82,68 @@ class MainActivity: ComponentActivity() {
             when(selectedTab) {
                 0 -> HomeScreen(students,columns,onNavigate={selectedTab=it},selectedClass,selectedSubject)
                 1 -> {
-                    Text("مدیریت کلاس و دانش‌آموز",style=MaterialTheme.typography.headlineSmall)
+                    Text("مدیریت کلاس‌ها",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
                     OutlinedTextField(nameInput,{nameInput=it},label={Text("نام دانش‌آموز")},modifier=Modifier.fillMaxWidth())
-                    OutlinedTextField(classInput,{classInput=it},label={Text("کلاس")},modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(classInput,{classInput=it},label={Text("کلاس / پایه")},modifier=Modifier.fillMaxWidth())
                     OutlinedTextField(subjectInput,{subjectInput=it},label={Text("درس")},modifier=Modifier.fillMaxWidth())
-                    Button(onClick={ if(nameInput.isNotBlank()){students=students+Student(nameInput.trim(),classInput.trim(),subjectInput.trim(),emptyMap());nameInput="";persist()} },modifier=Modifier.fillMaxWidth()){Text("افزودن دانش‌آموز")}
-                    students.forEach { s -> Card { Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(s.name,fontWeight=FontWeight.Bold);Text("${s.clazz} · ${s.subject}")};IconButton(onClick={students=students.filterNot{it==s};persist()}){Icon(Icons.Default.Delete,"حذف")} } } }
+                    Button(onClick={if(nameInput.isNotBlank()&&classInput.isNotBlank()&&subjectInput.isNotBlank()){
+                        val exists=students.any{it.name.equals(nameInput.trim(),true)&&it.clazz==classInput.trim()&&it.subject==subjectInput.trim()}
+                        if(!exists){students=students+Student(nameInput.trim(),classInput.trim(),subjectInput.trim(),emptyMap());persist();snackbar="دانش‌آموز ثبت شد."}else snackbar="این دانش‌آموز قبلاً ثبت شده است."
+                        nameInput=""
+                    }},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.PersonAdd,"");Text("ثبت دانش‌آموز")}
+                    Text("کلاس‌ها و درس‌ها",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+                    students.groupBy{it.clazz to it.subject}.forEach{(group,list)->
+                        Card { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                            Text(group.first,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium);Text(group.second,color=MaterialTheme.colorScheme.primary)
+                            Text(list.size.toString()+" دانش‌آموز · "+list.count{it.scores.isNotEmpty()}+" دارای نمره")
+                            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                                OutlinedButton(onClick={selectedClass=group.first;selectedSubject=group.second;selectedTab=2},modifier=Modifier.weight(1f)){Text("دفتر نمرات")}
+                                OutlinedButton(onClick={selectedClass=group.first;selectedSubject=group.second;selectedTab=3},modifier=Modifier.weight(1f)){Text("تحلیل")}
+                            }
+                            list.forEach{st->Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(st.name,fontWeight=FontWeight.SemiBold);Text("میانگین: "+(average(st.scores)?.let{"%.2f".format(it)}?: "—"))};IconButton(onClick={students=students.filterNot{it==st};persist()}){Icon(Icons.Default.Delete,"حذف")}}}
+                        }}
+                    }
                 }
                 2 -> {
-                    Text("دفتر نمرات",style=MaterialTheme.typography.headlineSmall)
-                    OutlinedTextField(selectedClass,{selectedClass=it},label={Text("کلاس")},modifier=Modifier.fillMaxWidth())
-                    OutlinedTextField(selectedSubject,{selectedSubject=it},label={Text("درس")},modifier=Modifier.fillMaxWidth())
-                    if(speechColumn.isBlank() && columns.isNotEmpty()) speechColumn=columns.first().name
-                    var columnExpanded by remember { mutableStateOf(false) }
-                    ExposedDropdownMenuBox(expanded=columnExpanded,onExpandedChange={columnExpanded=it}) {
-                        OutlinedTextField(value=speechColumn,onValueChange={},readOnly=true,label={Text("ستون نمره")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(columnExpanded)},modifier=Modifier.fillMaxWidth().menuAnchor())
-                        ExposedDropdownMenu(expanded=columnExpanded,onDismissRequest={columnExpanded=false}) { columns.forEach{col->DropdownMenuItem(text={Text(col.name)},onClick={speechColumn=col.name;columnExpanded=false})} }
-                    }
+                    Text("دفتر نمرات",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+                    Text("انتخاب کلاس و درس؛ ثبت نمرات و مشاهده خلاصه وضعیت.")
+                    val classOptions=students.map{it.clazz}.distinct().sorted()
+                    var classMenu by remember{mutableStateOf(false)}
+                    ExposedDropdownMenuBox(expanded=classMenu,onExpandedChange={classMenu=it}){OutlinedTextField(selectedClass,{selectedClass=it},readOnly=true,label={Text("کلاس")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(classMenu)},modifier=Modifier.fillMaxWidth().menuAnchor());ExposedDropdownMenu(expanded=classMenu,onDismissRequest={classMenu=false}){classOptions.forEach{DropdownMenuItem(text={Text(it)},onClick={selectedClass=it;classMenu=false})}}}
+                    val subjectOptions=students.filter{it.clazz==selectedClass}.map{it.subject}.distinct().sorted()
+                    var subjectMenu by remember{mutableStateOf(false)}
+                    ExposedDropdownMenuBox(expanded=subjectMenu,onExpandedChange={subjectMenu=it}){OutlinedTextField(selectedSubject,{selectedSubject=it},readOnly=true,label={Text("درس")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(subjectMenu)},modifier=Modifier.fillMaxWidth().menuAnchor());ExposedDropdownMenu(expanded=subjectMenu,onDismissRequest={subjectMenu=false}){subjectOptions.forEach{DropdownMenuItem(text={Text(it)},onClick={selectedSubject=it;subjectMenu=false})}}}
+                    val roster=students.filter{it.clazz==selectedClass&&it.subject==selectedSubject}.sortedBy{it.name}
+                    Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Row(Modifier.fillMaxWidth().padding(14.dp),horizontalArrangement=Arrangement.SpaceBetween){Column{Text("تعداد");Text(roster.size.toString(),fontWeight=FontWeight.Bold)};Column{Text("دارای نمره");Text(roster.count{it.scores.isNotEmpty()}.toString(),fontWeight=FontWeight.Bold)};Column{Text("میانگین کلاس");Text(classAverage(roster)?.let{"%.2f".format(it)}?: "—",fontWeight=FontWeight.Bold)}}}
+                    if(columns.isNotEmpty()&&speechColumn.isBlank())speechColumn=columns.first().name
+                    var colMenu by remember{mutableStateOf(false)}
+                    ExposedDropdownMenuBox(expanded=colMenu,onExpandedChange={colMenu=it}){OutlinedTextField(speechColumn,{speechColumn=it},readOnly=true,label={Text("ستون ثبت صوتی")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(colMenu)},modifier=Modifier.fillMaxWidth().menuAnchor());ExposedDropdownMenu(expanded=colMenu,onDismissRequest={colMenu=false}){columns.forEach{DropdownMenuItem(text={Text(it.name)},onClick={speechColumn=it.name;colMenu=false})}}}
                     Button(onClick={startSpeech()},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Mic,"");Text("ثبت نمره با صوت")}
-                    if(speechText.isNotBlank()) Card { Column(Modifier.padding(12.dp)){Text("گفتار تشخیص داده شده:");Text(speechText); Button(onClick={val parsed=parseVoice(speechText); if(parsed!=null){students=students.map{if(it.name.contains(parsed.first,true)&&it.clazz==selectedClass&&it.subject==selectedSubject)it.copy(scores=it.scores+(speechColumn to parsed.second))else it};persist();snackbar="نمره ثبت شد (در صورت تطبیق نام)."}else snackbar="نام و نمره را دستی وارد کنید.";speechText=""}){Text("تلاش برای ثبت")}} }
-                    students.filter{it.clazz==selectedClass&&it.subject==selectedSubject}.forEach { s -> Card { Column(Modifier.padding(12.dp)){Text(s.name,fontWeight=FontWeight.Bold);columns.forEach { c -> var value by remember(s.name,c.name){mutableStateOf(s.scores[c.name]?.toString().orEmpty())}; OutlinedTextField(value,{value=it;val n=it.toFloatOrNull();if(n!=null){students=students.map{st->if(st==s)st.copy(scores=st.scores+(c.name to n))else st};persist()}},label={Text("${c.name} (از ${c.max})")},modifier=Modifier.fillMaxWidth())};Text("میانگین: ${average(s.scores).let{if(it==null)"—" else "%.2f".format(it)}}") } } }
+                    if(speechText.isNotBlank())Card{Column(Modifier.padding(12.dp)){Text(speechText);Button(onClick={val parsed=parseVoice(speechText);val target=parsed?.let{p->roster.firstOrNull{it.name.contains(p.first,true)}};if(parsed!=null&&target!=null){students=students.map{if(it==target)it.copy(scores=it.scores+(speechColumn to parsed.second))else it};persist();snackbar="نمره ثبت شد."}else snackbar="نام دانش‌آموز را بررسی کنید.";speechText=""}){Text("تأیید و ثبت")}}}
+                    roster.forEach{st->Card{Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(st.name,fontWeight=FontWeight.Bold);Text(st.clazz+" · "+st.subject)};Text(average(st.scores)?.let{"%.2f".format(it)}?: "—",fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary)}
+                    columns.forEach{c->var v by remember(st.name,st.clazz,st.subject,c.name){mutableStateOf(st.scores[c.name]?.toString().orEmpty())};OutlinedTextField(v,{v=it;val n=it.replace("٫",".").toFloatOrNull();if(n!=null&&n in 0f..c.max){students=students.map{if(it==st)it.copy(scores=it.scores+(c.name to n))else it};persist()}else if(it.isBlank()){students=students.map{if(it==st)it.copy(scores=it.scores-c.name)else it};persist()}},label={Text(c.name+" (از "+c.max+")")},singleLine=true,modifier=Modifier.fillMaxWidth())}
+                    Text(scoreStatus(average(st.scores)),color=MaterialTheme.colorScheme.secondary)
+                    }}}
+                    Button(onClick={shareGradebook(ctx,selectedClass,selectedSubject,roster,columns)},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.FileDownload,"");Text("خروجی جدول در Word")}
                 }
                 3 -> {
-                    Text("تحلیل دانش‌آموزان",style=MaterialTheme.typography.headlineSmall)
-                    students.forEach { s -> StudentAnalysisCard(s,columns) }
+                    Text("تحلیل عملکرد کلاس",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+                    Text("تحلیل بر اساس کلاس و درس انتخاب‌شده؛ شاخص‌ها شفاف و قابل پیگیری‌اند.")
+                    val classOptions=students.map{it.clazz}.distinct().sorted()
+                    var classMenu by remember{mutableStateOf(false)}
+                    ExposedDropdownMenuBox(expanded=classMenu,onExpandedChange={classMenu=it}){OutlinedTextField(selectedClass,{selectedClass=it},readOnly=true,label={Text("کلاس")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(classMenu)},modifier=Modifier.fillMaxWidth().menuAnchor());ExposedDropdownMenu(expanded=classMenu,onDismissRequest={classMenu=false}){classOptions.forEach{DropdownMenuItem(text={Text(it)},onClick={selectedClass=it;classMenu=false})}}}
+                    val subjects=students.filter{it.clazz==selectedClass}.map{it.subject}.distinct().sorted()
+                    var subjectMenu by remember{mutableStateOf(false)}
+                    ExposedDropdownMenuBox(expanded=subjectMenu,onExpandedChange={subjectMenu=it}){OutlinedTextField(selectedSubject,{selectedSubject=it},readOnly=true,label={Text("درس")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(subjectMenu)},modifier=Modifier.fillMaxWidth().menuAnchor());ExposedDropdownMenu(expanded=subjectMenu,onDismissRequest={subjectMenu=false}){subjects.forEach{DropdownMenuItem(text={Text(it)},onClick={selectedSubject=it;subjectMenu=false})}}}
+                    val report=students.filter{it.clazz==selectedClass&&it.subject==selectedSubject}.sortedBy{it.name}
+                    val avgs=report.mapNotNull{average(it.scores)}
+                    val classAvg=if(avgs.isEmpty())null else avgs.average().toFloat()
+                    val high=report.count{(average(it.scores)?:-1f)>=17};val low=report.count{val a=average(it.scores);a!=null&&a<12};val missing=report.count{it.scores.isEmpty()}
+                    Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text(selectedClass+" · "+selectedSubject,fontWeight=FontWeight.Bold);Text("میانگین کلاس: "+(classAvg?.let{"%.2f".format(it)}?: "—"),style=MaterialTheme.typography.titleLarge);Text("دانش‌آموزان: "+report.size+" | عملکرد قوی (۱۷+): "+high+" | نیازمند توجه (<۱۲): "+low+" | بدون نمره: "+missing)}}
+                    Text("توزیع میانگین",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
+                    listOf("۱۸ تا ۲۰" to report.count{(average(it.scores)?:-1f)>=18},"۱۶ تا ۱۸" to report.count{val a=average(it.scores);a!=null&&a>=16&&a<18},"۱۴ تا ۱۶" to report.count{val a=average(it.scores);a!=null&&a>=14&&a<16},"۱۲ تا ۱۴" to report.count{val a=average(it.scores);a!=null&&a>=12&&a<14},"کمتر از ۱۲" to low,"بدون نمره" to missing).forEach{(label,count)->Row(verticalAlignment=Alignment.CenterVertically){Text(label,Modifier.weight(1f));LinearProgressIndicator(progress={if(report.isEmpty())0f else count.toFloat()/report.size},Modifier.weight(1f));Text(count.toString(),Modifier.width(32.dp))}}
+                    Button(onClick={shareAnalysis(ctx,selectedClass,selectedSubject,report,columns)},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.FileDownload,"");Text("خروجی تحلیل در Word")}
+                    report.forEach{StudentAnalysisCard(it,columns)}
                 }
                 4 -> {
                     Text("دستیار هوشمند طرح درس",style=MaterialTheme.typography.headlineSmall)
@@ -348,3 +386,17 @@ fun loadStudents(raw:String):List<Student> = try { val a=JSONArray(raw);(0 until
 fun saveStudents(list:List<Student>):String {val a=JSONArray();list.forEach{s->val scores=JSONObject();s.scores.forEach{(k,v)->scores.put(k,v)};a.put(JSONObject().put("name",s.name).put("clazz",s.clazz).put("subject",s.subject).put("scores",scores))};return a.toString()}
 fun loadColumns(raw:String):List<ScoreColumn> = try {val a=JSONArray(raw);(0 until a.length()).map{ScoreColumn(a.getString(it))}}catch(_:Exception){listOf(ScoreColumn("مستمر"),ScoreColumn("شفاهی"),ScoreColumn("آزمون"))}
 fun saveColumns(list:List<ScoreColumn>)=JSONArray().also{a->list.forEach{a.put(it.name)}}.toString()
+
+fun classAverage(students:List<Student>):Float?{val v=students.mapNotNull{average(it.scores)};return if(v.isEmpty())null else v.average().toFloat()}
+fun scoreStatus(a:Float?):String=when{a==null->"بدون نمره";a>=17->"بسیار خوب";a>=14->"خوب";a>=12->"قابل قبول";else->"نیازمند پیگیری"}
+fun htmlEsc(s:String)=s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;")
+fun shareGradebook(ctx:android.content.Context,clazz:String,subject:String,students:List<Student>,columns:List<ScoreColumn>){
+ val rows=students.sortedBy{it.name}.joinToString(""){st->"<tr><td>"+htmlEsc(st.name)+"</td>"+columns.joinToString(""){c->"<td>"+(st.scores[c.name]?.toString()?: "—")+"</td>"}+"<td>"+(average(st.scores)?.let{"%.2f".format(it)}?: "—")+"</td></tr>"}
+ val html="<html><head><meta charset='utf-8'><style>body{font-family:Arial;direction:rtl}table{border-collapse:collapse;width:100%}th,td{border:1px solid #555;padding:8px;text-align:center}th{background:#d4eff7}</style></head><body dir='rtl'><h2>دفتر نمرات</h2><p>کلاس: "+htmlEsc(clazz)+" | درس: "+htmlEsc(subject)+"</p><table><tr><th>نام دانش‌آموز</th>"+columns.joinToString(""){"<th>"+htmlEsc(it.name)+"</th>"}+"<th>میانگین</th></tr>"+rows+"</table></body></html>"
+ val i=Intent(Intent.ACTION_SEND).apply{type="text/html";putExtra(Intent.EXTRA_SUBJECT,"دفتر نمرات "+clazz+" - "+subject);putExtra(Intent.EXTRA_TEXT,html)};ctx.startActivity(Intent.createChooser(i,"ارسال جدول؛ قابل باز کردن در Word"))
+}
+fun shareAnalysis(ctx:android.content.Context,clazz:String,subject:String,students:List<Student>,columns:List<ScoreColumn>){
+ val rows=students.sortedBy{it.name}.joinToString(""){st->"<tr><td>"+htmlEsc(st.name)+"</td><td>"+(average(st.scores)?.let{"%.2f".format(it)}?: "—")+"</td><td>"+htmlEsc(scoreStatus(average(st.scores)))+"</td><td>"+st.scores.size+"</td><td>"+columns.filter{it.name !in st.scores}.joinToString("،"){htmlEsc(it.name)}+"</td></tr>"}
+ val html="<html><head><meta charset='utf-8'><style>body{font-family:Arial;direction:rtl}table{border-collapse:collapse;width:100%}th,td{border:1px solid #555;padding:8px;text-align:center}th{background:#d4eff7}</style></head><body dir='rtl'><h2>تحلیل عملکرد</h2><p>کلاس: "+htmlEsc(clazz)+" | درس: "+htmlEsc(subject)+"</p><table><tr><th>نام</th><th>میانگین</th><th>وضعیت</th><th>نمرات ثبت‌شده</th><th>نمرات ناقص</th></tr>"+rows+"</table></body></html>"
+ val i=Intent(Intent.ACTION_SEND).apply{type="text/html";putExtra(Intent.EXTRA_SUBJECT,"تحلیل "+clazz+" - "+subject);putExtra(Intent.EXTRA_TEXT,html)};ctx.startActivity(Intent.createChooser(i,"ارسال گزارش؛ قابل باز کردن در Word"))
+}
