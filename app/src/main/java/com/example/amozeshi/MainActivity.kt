@@ -159,7 +159,7 @@ class MainActivity: ComponentActivity() {
                             if(lessonRequest.isBlank()){snackbar="موضوع آزمون را وارد کنید.";return@OutlinedButton}
                             lessonLoading=true;lessonOutput=""
                             scope.launch{lessonOutput=if(apiKey.isNotBlank())generateLessonWithGroq(apiKey,lessonRequest,"quiz") else "برای آزمون‌سازی هوشمند، کلید Groq را در تنظیمات وارد کنید.";lessonLoading=false}
-                        },modifier=Modifier.weight(1f),enabled=!lessonLoading){Icon(Icons.Default.Quiz,"");Text("آزمون‌ساز")}
+                        },modifier=Modifier.weight(1f),enabled=!lessonLoading){Icon(Icons.Default.Assignment,"");Text("آزمون‌ساز")}
                     }
                     if(lessonLoading)LinearProgressIndicator(Modifier.fillMaxWidth())
                     if(lessonOutput.isNotBlank())Card{Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text(lessonOutput);Button(onClick={ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,lessonOutput)},"اشتراک خروجی آموزشی"))}){Icon(Icons.Default.Share,"");Text("اشتراک‌گذاری / چاپ")}}}
