@@ -113,14 +113,14 @@ class MainActivity: ComponentActivity() {
                     Button(onClick={
                         lessonLoading=true
                         scope.launch {
-                            lessonOutput=if(apiKey.isNotBlank()) generateLessonWithGemini(apiKey,lessonRequest) else lessonTemplate(lessonRequest)+"\n\nبرای تولید طرح درس مبتنی بر جستجوی وب، کلید Gemini API را در تنظیمات وارد کنید."
+                            lessonOutput=if(apiKey.isNotBlank()) generateLessonWithGroq(apiKey,lessonRequest) else lessonTemplate(lessonRequest)+"\n\nبرای تولید طرح درس هوشمند، کلید API گروک (Groq) را در تنظیمات وارد کنید."
                             lessonLoading=false
                         }
                         val q=java.net.URLEncoder.encode(lessonRequest+" کتاب درسی طرح درس نکات مهم","UTF-8")
                         ctx.startActivity(Intent(Intent.ACTION_VIEW,android.net.Uri.parse("https://www.google.com/search?q=$q")))
                     },modifier=Modifier.fillMaxWidth(),enabled=!lessonLoading){Icon(Icons.Default.Search,"");Text(if(lessonLoading)"در حال تهیه طرح درس..." else "جستجوی منابع و تهیه طرح درس")}
                     if(lessonOutput.isNotBlank()) Card { Column(Modifier.padding(12.dp)){Text(lessonOutput);Button(onClick={ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,lessonOutput)},"اشتراک طرح درس"))}){Text("اشتراک‌گذاری")} } }
-                    Text("با کلید Gemini API، طرح درس به‌صورت خودکار تولید می‌شود و ابزار جستجوی وب مدل برای یافتن منابع فعال می‌شود. مرورگر نیز برای جستجوی تکمیلی باز خواهد شد.",style=MaterialTheme.typography.bodySmall)
+                    Text("طرح درس با هوش مصنوعی Groq تولید می‌شود. برای بررسی منابع و مطالب کتاب، جستجوی تکمیلی در مرورگر نیز باز می‌شود.",style=MaterialTheme.typography.bodySmall)
                 }
                 5 -> {
                     Text("تنظیمات",style=MaterialTheme.typography.headlineSmall)
@@ -128,7 +128,7 @@ class MainActivity: ComponentActivity() {
                     columns.forEach { c -> Row(verticalAlignment=Alignment.CenterVertically){Text(c.name,Modifier.weight(1f));IconButton(onClick={columns=columns.filterNot{it==c};persist()}){Icon(Icons.Default.Delete,"حذف ستون")} } }
                     OutlinedTextField(newColumn,{newColumn=it},label={Text("نام ستون جدید")},modifier=Modifier.fillMaxWidth())
                     Button(onClick={if(newColumn.isNotBlank()){columns=columns+ScoreColumn(newColumn);newColumn="";persist()}},modifier=Modifier.fillMaxWidth()){Text("افزودن ستون")}
-                    OutlinedTextField(apiKey,{apiKey=it;prefs.edit().putString("api_key",it).apply()},label={Text("کلید API هوش مصنوعی (اختیاری)")},modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(apiKey,{apiKey=it;prefs.edit().putString("api_key",it).apply()},label={Text("کلید API هوش مصنوعی Groq (اختیاری)")},modifier=Modifier.fillMaxWidth())
                     Text("اطلاعات دانش‌آموزان روی همین دستگاه ذخیره می‌شود. برای پشتیبان‌گیری و همگام‌سازی در نسخه‌های بعدی.")
                 }
             }
@@ -278,22 +278,39 @@ fun parseVoice(text:String):Pair<String,Float>?{
     val name=text.replace(Regex("""\d+(?:[٫.]\d+)?"""),"").replace(Regex("""(نمره|امتحان|آزمون|درس|از|برای)"""),"").trim()
     return name.takeIf{it.isNotBlank()}?.let{it to score}
 }
-suspend fun generateLessonWithGemini(apiKey:String,request:String):String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+suspend fun generateLessonWithGroq(apiKey:String,request:String):String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
     try {
-        val url=java.net.URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key="+java.net.URLEncoder.encode(apiKey,"UTF-8"))
+        val url=java.net.URL("https://api.groq.com/openai/v1/chat/completions")
         val conn=url.openConnection() as java.net.HttpURLConnection
         conn.requestMethod="POST";conn.connectTimeout=30000;conn.readTimeout=60000;conn.doOutput=true
         conn.setRequestProperty("Content-Type","application/json")
-        val prompt="تو دستیار حرفه‌ای معلم فارسی‌زبان هستی. درخواست معلم: $request. اگر پایه یا عنوان درس مبهم/ناسازگار است، ابتدا این ابهام را در پاسخ مشخص کن. طرح درس شامل مشخصات، اهداف کلی و رفتاری، پیش‌نیاز، وسایل، مراحل تدریس و زمان، فعالیت معلم و دانش‌آموز، پرسش‌های ارزشیابی، تکلیف، نکات مهم کتاب و منابع باشد. مطالب factual را با جستجوی وب بررسی کن و منابع را ذکر کن. پاسخ فارسی و ساختاریافته باشد."
-        val body=JSONObject().put("contents",JSONArray().put(JSONObject().put("parts",JSONArray().put(JSONObject().put("text",prompt)))))
-            .put("tools",JSONArray().put(JSONObject().put("google_search",JSONObject())))
+        conn.setRequestProperty("Authorization","Bearer ${apiKey.trim()}")
+        val prompt="تو دستیار حرفه‌ای معلم فارسی‌زبان هستی. درخواست معلم: $request. اگر پایه یا عنوان درس مبهم/ناسازگار است، ابتدا ابهام را مشخص کن. طرح درس شامل مشخصات، اهداف کلی و رفتاری، پیش‌نیاز، وسایل، مراحل تدریس و زمان، فعالیت معلم و دانش‌آموز، پرسش‌های ارزشیابی، تکلیف، نکات مهم کتاب و منابع پیشنهادی باشد. پاسخ فارسی، دقیق، ساختاریافته و کاربردی باشد. درباره منابع یا اطلاعاتی که واقعاً بررسی نکرده‌ای ادعای بررسی نکن."
+        val body=JSONObject()
+            .put("model","llama-3.3-70b-versatile")
+            .put("messages",JSONArray()
+                .put(JSONObject().put("role","system").put("content","دستیار تخصصی طراحی آموزشی و طرح درس."))
+                .put(JSONObject().put("role","user").put("content",prompt)))
+            .put("temperature",0.4)
         conn.outputStream.use{it.write(body.toString().toByteArray(Charsets.UTF_8))}
-        val stream=if(conn.responseCode in 200..299)conn.inputStream else conn.errorStream
-        val raw=stream.bufferedReader().use{it.readText()}
-        if(conn.responseCode !in 200..299) "خطای سرویس هوش مصنوعی: $raw" else {
-            val json=JSONObject(raw);json.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+        val code=conn.responseCode
+        val stream=if(code in 200..299)conn.inputStream else conn.errorStream
+        val raw=stream?.bufferedReader()?.use{it.readText()} ?: ""
+        if(code !in 200..299) {
+            val err=try{JSONObject(raw).optJSONObject("error")?.optString("message").orEmpty()}catch(_:Exception){""}
+            when(code){
+                401->"کلید API گروک معتبر نیست. کلید را در تنظیمات بررسی کنید."
+                403->"دسترسی به مدل Groq مجاز نیست. وضعیت حساب و دسترسی مدل را بررسی کنید."
+                429->"محدودیت درخواست Groq اعمال شده است. کمی بعد دوباره تلاش کنید."
+                else->"خطای Groq ($code): ${err.ifBlank{"درخواست ناموفق بود."}}"
+            }
+        } else {
+            val json=JSONObject(raw)
+            json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
         }
-    } catch(e:Exception) { "اتصال به هوش مصنوعی ناموفق بود: ${e.message}\n\n"+lessonTemplate(request) }
+    } catch(e:Exception) {
+        "اتصال به Groq ناموفق بود: ${e.message ?: "خطای نامشخص"}\n\n"+lessonTemplate(request)
+    }
 }
 fun lessonTemplate(req:String)= """طرح درس پیشنهادی
 درخواست: $req
