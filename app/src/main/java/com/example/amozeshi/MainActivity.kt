@@ -33,7 +33,7 @@ data class Student(val name:String, val clazz:String, val subject:String, val sc
 data class ScoreColumn(val name:String, val max:Float=20f, val weight:Float=1f)
 
 class MainActivity: ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { MaterialTheme { App() } } }
+    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { YarMoallemTheme { App() } } }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -138,10 +138,121 @@ class MainActivity: ComponentActivity() {
 }
 
 @Composable fun HomeScreen(students:List<Student>,columns:List<ScoreColumn>,onNavigate:(Int)->Unit,clazz:String,subject:String){
-    Text("دستیار آموزشی معلم",style=MaterialTheme.typography.headlineSmall)
-    Card { Column(Modifier.padding(16.dp)){Text("خوش آمدید",fontWeight=FontWeight.Bold);Text("کلاس فعال: $clazz");Text("درس: $subject");Text("دانش‌آموزان ثبت‌شده: ${students.size}")} }
-    val items=listOf("مدیریت کلاس و دانش‌آموزان" to 1,"دفتر نمرات" to 2,"تحلیل عملکرد دانش‌آموزان" to 3,"دستیار طرح درس و جستجو" to 4,"طراحی جدول و تنظیمات" to 5)
-    items.forEach{(t,i)->Card(onClick={onNavigate(i)}){Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically){Text(t,Modifier.weight(1f));Icon(Icons.Default.ChevronRight,"")}}}
+    Column(verticalArrangement=Arrangement.spacedBy(18.dp)) {
+        Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+            Text("سلام، معلم عزیز 👋",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.onBackground)
+            Text("همه ابزارهای کلاس شما، یکجا.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Card(modifier=Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primary),shape=MaterialTheme.shapes.extraLarge) {
+            Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("کلاس فعال",color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.75f),style=MaterialTheme.typography.labelLarge)
+                        Text(clazz,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.headlineMedium,color=MaterialTheme.colorScheme.onPrimary)
+                        Text(subject,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.9f))
+                    }
+                    Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.12f)) {
+                        Icon(Icons.Default.School,null,Modifier.padding(14.dp).size(36.dp),tint=MaterialTheme.colorScheme.onPrimary)
+                    }
+                }
+                Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                    Surface(color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.13f),shape=MaterialTheme.shapes.large) {
+                        Row(Modifier.padding(horizontal=14.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically) {
+                            Icon(Icons.Default.Groups,null,tint=MaterialTheme.colorScheme.onPrimary)
+                            Spacer(Modifier.width(8.dp))
+                            Text("${students.size} دانش‌آموز",color=MaterialTheme.colorScheme.onPrimary,fontWeight=FontWeight.SemiBold)
+                        }
+                    }
+                    Surface(color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.13f),shape=MaterialTheme.shapes.large) {
+                        Row(Modifier.padding(horizontal=14.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically) {
+                            Icon(Icons.Default.Assignment,null,tint=MaterialTheme.colorScheme.onPrimary)
+                            Spacer(Modifier.width(8.dp))
+                            Text("${columns.size} ستون نمره",color=MaterialTheme.colorScheme.onPrimary,fontWeight=FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            DashboardStat("دانش‌آموزان",students.size.toString(),Icons.Default.Groups,Modifier.weight(1f))
+            DashboardStat("ستون‌های نمره",columns.size.toString(),Icons.Default.Assignment,Modifier.weight(1f))
+        }
+        Text("دسترسی سریع",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+        val tiles=listOf(
+            Triple("مدیریت کلاس","فهرست و اطلاعات دانش‌آموزان",Icons.Default.Groups) to 1,
+            Triple("دفتر نمرات","ثبت و ویرایش نمره‌ها",Icons.Default.Assignment) to 2,
+            Triple("تحلیل عملکرد","ارزیابی و شناسایی نیازها",Icons.Default.Insights) to 3,
+            Triple("دستیار طرح درس","ساخت طرح درس هوشمند",Icons.Default.AutoAwesome) to 4,
+            Triple("تنظیمات","شخصی‌سازی دفتر نمرات",Icons.Default.Settings) to 5
+        )
+        tiles.chunked(2).forEach { row ->
+            Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                row.forEach { (tile,index) ->
+                    DashboardTile(tile.first,tile.second,tile.third,Modifier.weight(1f)){onNavigate(index)}
+                }
+                if(row.size==1) Spacer(Modifier.weight(1f))
+            }
+        }
+        Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer),shape=MaterialTheme.shapes.large) {
+            Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
+                Icon(Icons.Default.Lightbulb,null,tint=MaterialTheme.colorScheme.secondary)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text("نکته",fontWeight=FontWeight.Bold)
+                    Text("برای شروع، دانش‌آموزان کلاس را ثبت کنید و سپس دفتر نمرات را تکمیل کنید.",style=MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+}
+@Composable private fun DashboardStat(label:String,value:String,icon:androidx.compose.ui.graphics.vector.ImageVector,modifier:Modifier=Modifier){
+    Card(modifier=modifier,shape=MaterialTheme.shapes.large,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            Surface(shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.primaryContainer) {
+                Icon(icon,null,Modifier.padding(10.dp),tint=MaterialTheme.colorScheme.primary)
+            }
+            Column {
+                Text(value,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+                Text(label,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+@Composable private fun DashboardTile(title:String,subtitle:String,icon:androidx.compose.ui.graphics.vector.ImageVector,modifier:Modifier=Modifier,onClick:()->Unit){
+    Card(modifier=modifier,shape=MaterialTheme.shapes.large,onClick=onClick,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.primaryContainer) {
+                Icon(icon,null,Modifier.padding(12.dp).size(26.dp),tint=MaterialTheme.colorScheme.primary)
+            }
+            Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                Text(title,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium)
+                Text(subtitle,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) { Icon(Icons.Default.ArrowForward,null,tint=MaterialTheme.colorScheme.primary) }
+        }
+    }
+}
+@Composable private fun YarMoallemTheme(content:@Composable ()->Unit){
+    val colors=lightColorScheme(
+        primary=androidx.compose.ui.graphics.Color(0xFF176B87),
+        onPrimary=androidx.compose.ui.graphics.Color.White,
+        primaryContainer=androidx.compose.ui.graphics.Color(0xFFD4EFF7),
+        onPrimaryContainer=androidx.compose.ui.graphics.Color(0xFF073747),
+        secondary=androidx.compose.ui.graphics.Color(0xFF3B7C70),
+        secondaryContainer=androidx.compose.ui.graphics.Color(0xFFD8EEE8),
+        background=androidx.compose.ui.graphics.Color(0xFFF4F8FA),
+        surface=androidx.compose.ui.graphics.Color.White,
+        onSurface=androidx.compose.ui.graphics.Color(0xFF172B35),
+        onSurfaceVariant=androidx.compose.ui.graphics.Color(0xFF607580),
+        outline=androidx.compose.ui.graphics.Color(0xFFD8E3E8)
+    )
+    MaterialTheme(colorScheme=colors,shapes=Shapes(
+        extraSmall=androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+        small=androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        medium=androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        large=androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+        extraLarge=androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
+    ),content=content)
 }
 @Composable fun StudentAnalysisCard(s:Student,columns:List<ScoreColumn>){
     val vals=s.scores.values
