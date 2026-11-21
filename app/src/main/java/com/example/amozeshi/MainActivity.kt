@@ -43,6 +43,10 @@ class MainActivity: ComponentActivity() {
     var students by remember { mutableStateOf(loadStudents(prefs.getString("students","[]") ?: "[]")) }
     var columns by remember { mutableStateOf(loadColumns(prefs.getString("columns","[\"مستمر\",\"شفاهی\",\"آزمون\"]") ?: "[]")) }
     var selectedTab by remember { mutableStateOf(0) }
+    var attendanceDate by remember { mutableStateOf(java.time.LocalDate.now().toString()) }
+    var attendance by remember { mutableStateOf(JSONObject(prefs.getString("attendance","{}") ?: "{}")) }
+    var timetable by remember { mutableStateOf(prefs.getString("timetable","") ?: "") }
+    var timetableEdit by remember { mutableStateOf(timetable) }
     var selectedClass by remember { mutableStateOf("نهم ۱") }
     var selectedSubject by remember { mutableStateOf("مطالعات اجتماعی") }
     var nameInput by remember { mutableStateOf("") }
@@ -74,7 +78,7 @@ class MainActivity: ComponentActivity() {
     }
     Scaffold(
         topBar={ TopAppBar(title={Text("یار معلم",fontWeight=FontWeight.Bold)}, actions={IconButton(onClick={selectedTab=5}){Icon(Icons.Default.Settings,"تنظیمات")}}) },
-        bottomBar={ NavigationBar { val labels=listOf("خانه","کلاس","نمرات","تحلیل","طرح درس","تنظیمات"); val icons=listOf(Icons.Default.Home,Icons.Default.Groups,Icons.Default.Assignment,Icons.Default.Insights,Icons.Default.AutoAwesome,Icons.Default.Settings)
+        bottomBar={ NavigationBar { val labels=listOf("خانه","کلاس","نمرات","تحلیل","طرح درس","تنظیمات","حضور","برنامه"); val icons=listOf(Icons.Default.Home,Icons.Default.Groups,Icons.Default.Assignment,Icons.Default.Insights,Icons.Default.AutoAwesome,Icons.Default.Settings,Icons.Default.CheckCircle,Icons.Default.CalendarMonth)
             labels.forEachIndexed { i,label -> NavigationBarItem(selected=selectedTab==i,onClick={selectedTab=i},icon={Icon(icons[i],label)},label={Text(label)}) } } },
         snackbarHost={SnackbarHost(remember { SnackbarHostState() }) }
     ) { padding ->
@@ -173,12 +177,29 @@ class MainActivity: ComponentActivity() {
                     Button(onClick={if(newColumn.isNotBlank()){columns=columns+ScoreColumn(newColumn);newColumn="";persist()}},modifier=Modifier.fillMaxWidth()){Text("افزودن ستون")}
                     OutlinedTextField(apiKey,{apiKey=it;prefs.edit().putString("api_key",it).apply()},label={Text("کلید API هوش مصنوعی Groq (اختیاری)")},modifier=Modifier.fillMaxWidth())
                     Button(onClick={
-                        val backup=JSONObject().put("app","YarMoallem").put("version",1).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).toString(2)
+                        val backup=JSONObject().put("app","YarMoallem").put("version",1).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).put("attendance",attendance).put("timetable",timetable).toString(2)
                         ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="application/json";putExtra(Intent.EXTRA_SUBJECT,"پشتیبان یار معلم");putExtra(Intent.EXTRA_TEXT,backup)},"ذخیره یا ارسال نسخه پشتیبان"))
                     },modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Backup,"");Text("خروجی پشتیبان اطلاعات")}
                     Text("پشتیبان شامل فهرست دانش‌آموزان، کلاس‌ها، درس‌ها و نمرات است. فایل/متن خروجی را در فضای امن نگه دارید.",style=MaterialTheme.typography.bodySmall)
                     Text("اطلاعات دانش‌آموزان روی همین دستگاه ذخیره می‌شود.")
                 }
+            }
+            6 -> {
+                Text("حضور و غیاب",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+                OutlinedTextField(attendanceDate,{attendanceDate=it},label={Text("تاریخ (YYYY-MM-DD)")},modifier=Modifier.fillMaxWidth())
+                val roster=students.filter{it.clazz==selectedClass&&it.subject==selectedSubject}.sortedBy{it.name}
+                Text("کلاس: $selectedClass · درس: $selectedSubject")
+                val day=attendance.optJSONObject(attendanceDate)?:JSONObject()
+                Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Row(Modifier.fillMaxWidth().padding(14.dp),horizontalArrangement=Arrangement.SpaceBetween){Text("حاضر: "+roster.count{day.optString(it.name)=="present"});Text("غایب: "+roster.count{day.optString(it.name)=="absent"})}}
+                roster.forEach{st->Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically){Text(st.name,Modifier.weight(1f));FilterChip(selected=day.optString(st.name)=="present",onClick={day.put(st.name,"present");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply()},label={Text("حاضر")});Spacer(Modifier.width(6.dp));FilterChip(selected=day.optString(st.name)=="absent",onClick={day.put(st.name,"absent");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply()},label={Text("غایب")})}}
+                Button(onClick={val report=roster.joinToString("\\n"){it.name+" : "+when(day.optString(it.name)){"present"->"حاضر";"absent"->"غایب";else->"ثبت نشده"}};ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_SUBJECT,"حضور و غیاب $attendanceDate");putExtra(Intent.EXTRA_TEXT,report)},"اشتراک گزارش حضور"))},modifier=Modifier.fillMaxWidth()){Text("خروجی حضور و غیاب")}
+            }
+            7 -> {
+                Text("برنامه هفتگی",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+                Text("روز، ساعت، کلاس و درس را وارد کنید.")
+                OutlinedTextField(timetableEdit,{timetableEdit=it},modifier=Modifier.fillMaxWidth(),minLines=8,label={Text("شنبه تا پنجشنبه · ساعت · کلاس · درس")})
+                Button(onClick={timetable=timetableEdit;prefs.edit().putString("timetable",timetable).apply();snackbar="برنامه هفتگی ذخیره شد."},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Save,"");Text("ذخیره برنامه")}
+                OutlinedButton(onClick={ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,timetable)},"اشتراک برنامه هفتگی"))},modifier=Modifier.fillMaxWidth()){Text("اشتراک برنامه")}
             }
             if(snackbar.isNotBlank()) Text(snackbar,color=MaterialTheme.colorScheme.primary)
         }
