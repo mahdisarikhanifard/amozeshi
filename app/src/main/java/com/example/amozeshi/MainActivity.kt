@@ -172,7 +172,12 @@ class MainActivity: ComponentActivity() {
                     OutlinedTextField(newColumn,{newColumn=it},label={Text("نام ستون جدید")},modifier=Modifier.fillMaxWidth())
                     Button(onClick={if(newColumn.isNotBlank()){columns=columns+ScoreColumn(newColumn);newColumn="";persist()}},modifier=Modifier.fillMaxWidth()){Text("افزودن ستون")}
                     OutlinedTextField(apiKey,{apiKey=it;prefs.edit().putString("api_key",it).apply()},label={Text("کلید API هوش مصنوعی Groq (اختیاری)")},modifier=Modifier.fillMaxWidth())
-                    Text("اطلاعات دانش‌آموزان روی همین دستگاه ذخیره می‌شود. برای پشتیبان‌گیری و همگام‌سازی در نسخه‌های بعدی.")
+                    Button(onClick={
+                        val backup=JSONObject().put("app","YarMoallem").put("version",1).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).toString(2)
+                        ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="application/json";putExtra(Intent.EXTRA_SUBJECT,"پشتیبان یار معلم");putExtra(Intent.EXTRA_TEXT,backup)},"ذخیره یا ارسال نسخه پشتیبان"))
+                    },modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Backup,"");Text("خروجی پشتیبان اطلاعات")}
+                    Text("پشتیبان شامل فهرست دانش‌آموزان، کلاس‌ها، درس‌ها و نمرات است. فایل/متن خروجی را در فضای امن نگه دارید.",style=MaterialTheme.typography.bodySmall)
+                    Text("اطلاعات دانش‌آموزان روی همین دستگاه ذخیره می‌شود.")
                 }
             }
             if(snackbar.isNotBlank()) Text(snackbar,color=MaterialTheme.colorScheme.primary)
