@@ -33,6 +33,7 @@ class MainActivity: ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { MaterialTheme { App() } } }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable fun App() {
     val ctx= LocalContext.current
     val prefs=ctx.getSharedPreferences("yar_moallem",0)
