@@ -157,9 +157,7 @@ class MainActivity: ComponentActivity() {
                         Button(onClick={
                             if(lessonRequest.isBlank()){snackbar="موضوع یا مشخصات کتاب را وارد کنید.";return@Button}
                             lessonLoading=true;lessonOutput=""
-                            scope.launch{lessonOutput=if(apiKey.isNotBlank())generateLessonWithGroq(apiKey,lessonRequest,"lesson") else lessonTemplate(lessonRequest)+"
-
-برای استفاده از جستجوی کتاب و هوش مصنوعی، کلید Groq را در تنظیمات وارد کنید.";lessonLoading=false}
+                            scope.launch{lessonOutput=if(apiKey.isNotBlank())generateLessonWithGroq(apiKey,lessonRequest,"lesson") else lessonTemplate(lessonRequest)+"\\n\\nبرای استفاده از جستجوی کتاب و هوش مصنوعی، کلید Groq را در تنظیمات وارد کنید.";lessonLoading=false}
                         },modifier=Modifier.weight(1f),enabled=!lessonLoading){Icon(Icons.Default.MenuBook,"");Text("طرح درس")}
                         OutlinedButton(onClick={
                             if(lessonRequest.isBlank()){snackbar="موضوع آزمون را وارد کنید.";return@OutlinedButton}
@@ -173,7 +171,7 @@ class MainActivity: ComponentActivity() {
                 }
                 5 -> {
                     Text("تنظیمات",style=MaterialTheme.typography.headlineSmall)
-                    Text("تنظیمات در بخش‌های جداگانه",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)\n                    Card { Column(Modifier.padding(12.dp)){Text("دفتر نمرات",fontWeight=FontWeight.Bold);Text("مدیریت ستون‌ها و مقیاس نمرات")} }\n                    Card { Column(Modifier.padding(12.dp)){Text("هوش مصنوعی",fontWeight=FontWeight.Bold);Text("تنظیم کلید API و تولید طرح درس و آزمون")} }\n                    Card { Column(Modifier.padding(12.dp)){Text("پشتیبان‌گیری",fontWeight=FontWeight.Bold);Text("خروجی و نگهداری اطلاعات")} }\n                    Text("طراحی ستون‌های دفتر نمرات")
+                    Text("طراحی ستون‌های دفتر نمرات")
                     columns.forEach { c -> Row(verticalAlignment=Alignment.CenterVertically){Text(c.name,Modifier.weight(1f));IconButton(onClick={columns=columns.filterNot{it==c};persist()}){Icon(Icons.Default.Delete,"حذف ستون")} } }
                     OutlinedTextField(newColumn,{newColumn=it},label={Text("نام ستون جدید")},modifier=Modifier.fillMaxWidth())
                     Button(onClick={if(newColumn.isNotBlank()){columns=columns+ScoreColumn(newColumn);newColumn="";persist()}},modifier=Modifier.fillMaxWidth()){Text("افزودن ستون")}
@@ -187,7 +185,7 @@ class MainActivity: ComponentActivity() {
                 }
             6 -> {
                 Text("حضور و غیاب",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-                OutlinedTextField(attendanceDate,{attendanceDate=it},label={Text("تاریخ (YYYY-MM-DD)")},modifier=Modifier.fillMaxWidth())\n                Text("تاریخ شمسی: "+jalaliDateLabel(attendanceDate),style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary)\n                Text("گزارش ماهانه (بر اساس ماه تاریخ انتخاب‌شده)",fontWeight=FontWeight.Bold)\n                val monthRecords=attendance.keys().asSequence().filter{it.startsWith(attendanceDate.take(7))}.sorted().toList()\n                if(monthRecords.isEmpty()) Text("در این ماه سابقه‌ای ثبت نشده است.") else monthRecords.forEach{dateKey->val rec=attendance.optJSONObject(dateKey)?:JSONObject();Text(jalaliDateLabel(dateKey)+" · حاضر: "+rec.keys().asSequence().count{rec.optString(it)=="present"}+" · غایب: "+rec.keys().asSequence().count{rec.optString(it)=="absent"})}
+                OutlinedTextField(attendanceDate,{attendanceDate=it},label={Text("تاریخ (YYYY-MM-DD)")},modifier=Modifier.fillMaxWidth())
                 val roster=students.filter{it.clazz==selectedClass&&it.subject==selectedSubject}.sortedBy{it.name}
                 Text("کلاس: $selectedClass · درس: $selectedSubject")
                 val day=attendance.optJSONObject(attendanceDate)?:JSONObject()
@@ -346,22 +344,7 @@ class MainActivity: ComponentActivity() {
         if(avg!=null) Text(when{avg>=17->"عملکرد بسیار خوب؛ پیشنهاد: فعالیت‌های چالشی و تعمیقی.";avg>=14->"عملکرد خوب؛ مرور هدفمند نکات دشوار.";avg>=12->"عملکرد متوسط؛ تمرین تکمیلی توصیه می‌شود.";else->"نیازمند برنامه حمایتی، بررسی نقاط ضعف و پیگیری فردی."})
     } }
 }
-fun jalaliDateLabel(iso:String):String {
-    return try {
-        val p=iso.split("-"); val gy=p[0].toInt(); val gm=p[1].toInt(); val gd=p[2].toInt()
-        val gdm=intArrayOf(0,31,59,90,120,151,181,212,243,273,304,334)
-        var gy2=gy-1600; val gm2=gm-1; val gd2=gd-1
-        var gdn=365*gy2+gy2/4-gy2/100+gy2/400+gdm[gm2]+gd2
-        if(gm>2 && gy%4==0 && (gy%100!=0 || gy%400==0)) gdn++
-        var jdn=gdn-79; val jnp=jdn/12053; jdn%=12053
-        var jy=979+33*jnp+4*(jdn/1461); jdn%=1461
-        if(jdn>=366){jy+=(jdn-1)/365;jdn=(jdn-1)%365}
-        val jm=if(jdn<186)1+jdn/31 else 7+(jdn-186)/30
-        val jd=if(jdn<186)1+jdn%31 else 1+(jdn-186)%30
-        String.format(Locale("fa"),"%04d/%02d/%02d",jy,jm,jd)
-    } catch(_:Exception) { iso }
-}
-\nfun average(scores:Map<String,Float>):Float?=scores.values.takeIf{it.isNotEmpty()}?.average()?.toFloat()
+fun average(scores:Map<String,Float>):Float?=scores.values.takeIf{it.isNotEmpty()}?.average()?.toFloat()
 fun parseVoice(text:String):Pair<String,Float>?{
     val nums=Regex("""\d+(?:[٫.]\d+)?""").findAll(text).mapNotNull{it.value.replace('٫','.').toFloatOrNull()}.toList()
     if(nums.isEmpty())return null
@@ -376,12 +359,12 @@ suspend fun generateLessonWithGroq(apiKey:String,request:String,mode:String="les
         conn.setRequestProperty("Content-Type","application/json");conn.setRequestProperty("Authorization","Bearer ${apiKey.trim()}")
         val task=if(mode=="quiz")"""برای این موضوع آزمون استاندارد بساز: ۱۰ سؤال متنوع شامل چهارگزینه‌ای، صحیح/غلط، پاسخ کوتاه و تشریحی. پاسخنامه و بارم‌بندی را جداگانه بنویس. سطح سؤال‌ها آسان تا دشوار باشد و مطالب تأییدنشده را به کتاب نسبت نده.""" else """طرح درس حرفه‌ای تولید کن: اهداف رفتاری، پیش‌نیاز، وسایل، ایجاد انگیزه، مراحل تدریس با زمان، فعالیت معلم و دانش‌آموز، مثال‌های کتاب، ارزشیابی آغازین/تکوینی/پایانی، تکلیف و تمایز آموزشی برای دانش‌آموزان ضعیف و قوی. برای ریاضی حل مثال‌ها مرحله‌به‌مرحله و مناسب پایه باشد."""
         val prompt="""درخواست: $request
-در صورت داشتن دانش معتبر درباره محتوای آموزشی موضوع، از آن استفاده کن؛ اما ادعا نکن که وب یا کتاب رسمی را زنده بررسی کرده‌ای. مطالب تأییدنشده را «پیشنهادی/عمومی» مشخص کن و منبع یا صفحه ساختگی نکن.
+ابتدا با browser_search کتاب رسمی آموزش‌وپرورش ایران، PDF کتاب و منابع معتبر مانند chap.sch.ir و رشد را جستجو کن. پایه، عنوان فصل و درس و محتوای دقیق را تطبیق بده. فقط محتوای بررسی‌شده را به کتاب نسبت بده. اگر متن یا منبع دقیق پیدا نشد، صریح بنویس «متن دقیق کتاب تأیید نشد» و محتوای عمومی را از مطالب کتاب جدا کن؛ هیچ صفحه، تمرین یا مثال ساختگی نکن. اگر مشخصات مبهم است، ابهام را اعلام کن.
 $task
 خروجی فارسی، منظم و کاربردی باشد؛ منابع و لینک‌های بررسی‌شده و میزان اطمینان را ذکر کن."""
         val body=JSONObject().put("model","openai/gpt-oss-120b")
-            .put("messages",JSONArray().put(JSONObject().put("role","system").put("content","دستیار حرفه‌ای طراحی آموزشی فارسی؛ دقیق، ساختارمند و بدون جعل منابع.")).put(JSONObject().put("role","user").put("content",prompt)))
-            .put("temperature",0.3).put("max_completion_tokens",6000)
+            .put("messages",JSONArray().put(JSONObject().put("role","system").put("content","دستیار پژوهش آموزشی و طراحی درس؛ جستجوی وب را انجام بده و از جعل منابع پرهیز کن.")).put(JSONObject().put("role","user").put("content",prompt)))
+            .put("tools",JSONArray().put(JSONObject().put("type","browser_search"))).put("tool_choice","required").put("temperature",0.3).put("max_completion_tokens",6000)
         conn.outputStream.use{it.write(body.toString().toByteArray(Charsets.UTF_8))}
         val code=conn.responseCode;val raw=(if(code in 200..299)conn.inputStream else conn.errorStream)?.bufferedReader()?.use{it.readText()} ?: ""
         if(code !in 200..299){val err=try{JSONObject(raw).optJSONObject("error")?.optString("message").orEmpty()}catch(_:Exception){""};when(code){401->"کلید Groq معتبر نیست.";403->"دسترسی به جستجوی وب یا مدل مجاز نیست.";429->"محدودیت درخواست Groq؛ کمی بعد تلاش کنید.";else->"خطای Groq ($code): ${err.ifBlank{"درخواست ناموفق"}}"}}
