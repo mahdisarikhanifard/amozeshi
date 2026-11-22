@@ -199,8 +199,28 @@ class MainActivity: ComponentActivity() {
                 }
             6 -> {
                 Text("حضور و غیاب",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-                OutlinedTextField(attendanceDate,{attendanceDate=it},label={Text("تاریخ میلادی برای ذخیره (YYYY-MM-DD)")},modifier=Modifier.fillMaxWidth())
-                Text("تاریخ شمسی: "+jalaliDateLabel(attendanceDate),style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary)
+                val attendanceClasses=students.map{it.clazz}.distinct().sorted()
+                var attendanceClassMenu by remember{mutableStateOf(false)}
+                ExposedDropdownMenuBox(expanded=attendanceClassMenu,onExpandedChange={attendanceClassMenu=it}) {
+                    OutlinedTextField(selectedClass,{selectedClass=it},readOnly=true,label={Text("انتخاب کلاس")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(attendanceClassMenu)},modifier=Modifier.fillMaxWidth().menuAnchor())
+                    ExposedDropdownMenu(expanded=attendanceClassMenu,onDismissRequest={attendanceClassMenu=false}) { attendanceClasses.forEach{cl->DropdownMenuItem(text={Text(cl)},onClick={selectedClass=cl;attendanceClassMenu=false;selectedSubject=students.filter{it.clazz==cl}.map{it.subject}.distinct().firstOrNull() ?: selectedSubject})} }
+                }
+                val attendanceSubjects=students.filter{it.clazz==selectedClass}.map{it.subject}.distinct().sorted()
+                var attendanceSubjectMenu by remember{mutableStateOf(false)}
+                ExposedDropdownMenuBox(expanded=attendanceSubjectMenu,onExpandedChange={attendanceSubjectMenu=it}) {
+                    OutlinedTextField(selectedSubject,{selectedSubject=it},readOnly=true,label={Text("درس")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(attendanceSubjectMenu)},modifier=Modifier.fillMaxWidth().menuAnchor())
+                    ExposedDropdownMenu(expanded=attendanceSubjectMenu,onDismissRequest={attendanceSubjectMenu=false}) { attendanceSubjects.forEach{su->DropdownMenuItem(text={Text(su)},onClick={selectedSubject=su;attendanceSubjectMenu=false})} }
+                }
+                var jalaliYear by remember{mutableStateOf(jalaliDateLabel(attendanceDate).take(4))}
+                var jalaliMonth by remember{mutableStateOf(jalaliDateLabel(attendanceDate).drop(5).take(2))}
+                var jalaliDay by remember{mutableStateOf(jalaliDateLabel(attendanceDate).takeLast(2))}
+                Text("تاریخ حضور و غیاب (شمسی)",fontWeight=FontWeight.Bold)
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(jalaliYear,{jalaliYear=it;jalaliToIso(it,jalaliMonth,jalaliDay)?.let{attendanceDate=it}},label={Text("سال")},modifier=Modifier.weight(1f),singleLine=true)
+                    OutlinedTextField(jalaliMonth,{jalaliMonth=it;jalaliToIso(jalaliYear,it,jalaliDay)?.let{attendanceDate=it}},label={Text("ماه")},modifier=Modifier.weight(1f),singleLine=true)
+                    OutlinedTextField(jalaliDay,{jalaliDay=it;jalaliToIso(jalaliYear,jalaliMonth,it)?.let{attendanceDate=it}},label={Text("روز")},modifier=Modifier.weight(1f),singleLine=true)
+                }
+                Text("تاریخ انتخاب‌شده: "+jalaliDateLabel(attendanceDate),style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary)
                 val roster=students.filter{it.clazz==selectedClass&&it.subject==selectedSubject}.sortedBy{it.name}
                 Text("کلاس: $selectedClass · درس: $selectedSubject")
                 val day=attendance.optJSONObject(attendanceDate)?:JSONObject()
@@ -366,6 +386,25 @@ class MainActivity: ComponentActivity() {
         Text("نمرات ثبت‌نشده: ${if(missing.isEmpty())"ندارد" else missing.joinToString()}")
         if(avg!=null) Text(when{avg>=17->"عملکرد بسیار خوب؛ پیشنهاد: فعالیت‌های چالشی و تعمیقی.";avg>=14->"عملکرد خوب؛ مرور هدفمند نکات دشوار.";avg>=12->"عملکرد متوسط؛ تمرین تکمیلی توصیه می‌شود.";else->"نیازمند برنامه حمایتی، بررسی نقاط ضعف و پیگیری فردی."})
     } }
+}
+fun jalaliToIso(yearText:String,monthText:String,dayText:String):String? {
+    return try {
+        val jy=yearText.toInt();val jm=monthText.toInt();val jd=dayText.toInt()
+        if(jm !in 1..12 || jd !in 1..if(jm<=6)31 else 30) return null
+        val jy2=jy-979;var jdn=365*jy2+(jy2/33)*8+(jy2%33+3)/4
+        for(i in 1 until jm) jdn+=if(i<=6)31 else 30
+        jdn+=jd-1
+        var gdn=jdn+79;var gy=1600+400*(gdn/146097);gdn%=146097
+        var leap=true
+        if(gdn>=36525){gdn--;gy+=100*(gdn/36524);gdn%=36524;if(gdn>=365)gdn++ else leap=false}
+        gy+=4*(gdn/1461);gdn%=1461
+        if(gdn>=366){leap=false;gdn--;gy+=gdn/365;gdn%=365}
+        val gd=gdn+1
+        val months=intArrayOf(31,if(leap)29 else 28,31,30,31,30,31,31,30,31,30,31)
+        var gm=1;var rem=gd
+        while(gm<=12&&rem>months[gm-1]){rem-=months[gm-1];gm++}
+        String.format(Locale.US,"%04d-%02d-%02d",gy,gm,rem)
+    }catch(_:Exception){null}
 }
 fun jalaliDateLabel(iso:String):String {
     return try {
