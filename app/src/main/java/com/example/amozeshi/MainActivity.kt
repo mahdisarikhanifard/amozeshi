@@ -43,6 +43,7 @@ class MainActivity: ComponentActivity() {
     var students by remember { mutableStateOf(loadStudents(prefs.getString("students","[]") ?: "[]")) }
     var columns by remember { mutableStateOf(loadColumns(prefs.getString("columns","[\"مستمر\",\"شفاهی\",\"آزمون\"]") ?: "[]")) }
     var selectedTab by remember { mutableStateOf(0) }
+    var settingsPage by remember { mutableStateOf("") }
     var attendanceDate by remember { mutableStateOf(java.time.LocalDate.now().toString()) }
     var attendance by remember { mutableStateOf(JSONObject(prefs.getString("attendance","{}") ?: "{}")) }
     var timetable by remember { mutableStateOf(prefs.getString("timetable","") ?: "") }
@@ -171,25 +172,42 @@ class MainActivity: ComponentActivity() {
                 }
                 5 -> {
                     Text("تنظیمات",style=MaterialTheme.typography.headlineSmall)
-                    Text("طراحی ستون‌های دفتر نمرات")
-                    columns.forEach { c -> Row(verticalAlignment=Alignment.CenterVertically){Text(c.name,Modifier.weight(1f));IconButton(onClick={columns=columns.filterNot{it==c};persist()}){Icon(Icons.Default.Delete,"حذف ستون")} } }
-                    OutlinedTextField(newColumn,{newColumn=it},label={Text("نام ستون جدید")},modifier=Modifier.fillMaxWidth())
-                    Button(onClick={if(newColumn.isNotBlank()){columns=columns+ScoreColumn(newColumn);newColumn="";persist()}},modifier=Modifier.fillMaxWidth()){Text("افزودن ستون")}
-                    OutlinedTextField(apiKey,{apiKey=it;prefs.edit().putString("api_key",it).apply()},label={Text("کلید API هوش مصنوعی Groq (اختیاری)")},modifier=Modifier.fillMaxWidth())
-                    Button(onClick={
-                        val backup=JSONObject().put("app","YarMoallem").put("version",1).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).put("attendance",attendance).put("timetable",timetable).toString(2)
-                        ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="application/json";putExtra(Intent.EXTRA_SUBJECT,"پشتیبان یار معلم");putExtra(Intent.EXTRA_TEXT,backup)},"ذخیره یا ارسال نسخه پشتیبان"))
-                    },modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Backup,"");Text("خروجی پشتیبان اطلاعات")}
-                    Text("پشتیبان شامل فهرست دانش‌آموزان، کلاس‌ها، درس‌ها و نمرات است. فایل/متن خروجی را در فضای امن نگه دارید.",style=MaterialTheme.typography.bodySmall)
+                    if(settingsPage.isBlank()) {
+                        listOf("دفتر نمرات","هوش مصنوعی","پشتیبان‌گیری").forEach { page ->
+                            Card(onClick={settingsPage=page},modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)){Text(page,fontWeight=FontWeight.Bold);Text(when(page){"دفتر نمرات"->"مدیریت ستون‌ها و مقیاس نمرات";"هوش مصنوعی"->"کلید API و تنظیمات تولید محتوا";else->"خروجی و نگهداری داده‌ها"})} }
+                        }
+                    } else {
+                        TextButton(onClick={settingsPage=""}){Text("← بازگشت به تنظیمات")}
+                        Text(settingsPage,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+                        when(settingsPage) {
+                            "دفتر نمرات" -> {
+                                columns.forEach { c -> Row(verticalAlignment=Alignment.CenterVertically){Text(c.name,Modifier.weight(1f));IconButton(onClick={columns=columns.filterNot{it==c};persist()}){Icon(Icons.Default.Delete,"حذف ستون")} } }
+                                OutlinedTextField(newColumn,{newColumn=it},label={Text("نام ستون جدید")},modifier=Modifier.fillMaxWidth())
+                                Button(onClick={if(newColumn.isNotBlank()&&columns.none{it.name==newColumn.trim()}){columns=columns+ScoreColumn(newColumn.trim());newColumn="";persist()}},modifier=Modifier.fillMaxWidth()){Text("افزودن ستون")}
+                            }
+                            "هوش مصنوعی" -> OutlinedTextField(apiKey,{apiKey=it;prefs.edit().putString("api_key",it).apply()},label={Text("کلید API Groq")},modifier=Modifier.fillMaxWidth())
+                            "پشتیبان‌گیری" -> {
+                                Button(onClick={
+                                    val backup=JSONObject().put("app","YarMoallem").put("version",1).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).put("attendance",attendance).put("timetable",timetable).toString(2)
+                                    ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="application/json";putExtra(Intent.EXTRA_SUBJECT,"پشتیبان یار معلم");putExtra(Intent.EXTRA_TEXT,backup)},"ذخیره یا ارسال نسخه پشتیبان"))
+                                },modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Backup,"");Text("خروجی پشتیبان اطلاعات")}
+                                Text("پشتیبان شامل دانش‌آموزان، نمرات، حضور و غیاب و برنامه هفتگی است.")
+                            }
+                        }
+                    }
                     Text("اطلاعات دانش‌آموزان روی همین دستگاه ذخیره می‌شود.")
                 }
             6 -> {
                 Text("حضور و غیاب",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-                OutlinedTextField(attendanceDate,{attendanceDate=it},label={Text("تاریخ (YYYY-MM-DD)")},modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(attendanceDate,{attendanceDate=it},label={Text("تاریخ میلادی برای ذخیره (YYYY-MM-DD)")},modifier=Modifier.fillMaxWidth())
+                Text("تاریخ شمسی: "+jalaliDateLabel(attendanceDate),style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary)
                 val roster=students.filter{it.clazz==selectedClass&&it.subject==selectedSubject}.sortedBy{it.name}
                 Text("کلاس: $selectedClass · درس: $selectedSubject")
                 val day=attendance.optJSONObject(attendanceDate)?:JSONObject()
-                Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Row(Modifier.fillMaxWidth().padding(14.dp),horizontalArrangement=Arrangement.SpaceBetween){Text("حاضر: "+roster.count{day.optString(it.name)=="present"});Text("غایب: "+roster.count{day.optString(it.name)=="absent"})}}
+                Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Row(Modifier.fillMaxWidth().padding(14.dp),horizontalArrangement=Arrangement.SpaceBetween){Text("حاضر: "+roster.count{day.optString(it.name)=="present"});Text("غایب: "+roster.count{day.optString(it.name)=="absent"});Text("ثبت‌نشده: "+roster.count{day.optString(it.name).isBlank()})}}
+                Text("سوابق ماه انتخاب‌شده",fontWeight=FontWeight.Bold)
+                val monthRecords=attendance.keys().asSequence().filter{it.startsWith(attendanceDate.take(7))}.sorted().toList()
+                if(monthRecords.isEmpty()) Text("در این ماه سابقه‌ای ثبت نشده است.") else monthRecords.forEach{dateKey->val rec=attendance.optJSONObject(dateKey)?:JSONObject();Card{Column(Modifier.padding(10.dp)){Text(jalaliDateLabel(dateKey),fontWeight=FontWeight.Bold);Text("حاضر: "+rec.keys().asSequence().count{rec.optString(it)=="present"}+" · غایب: "+rec.keys().asSequence().count{rec.optString(it)=="absent"})}}}
                 roster.forEach{st->Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically){Text(st.name,Modifier.weight(1f));FilterChip(selected=day.optString(st.name)=="present",onClick={day.put(st.name,"present");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply()},label={Text("حاضر")});Spacer(Modifier.width(6.dp));FilterChip(selected=day.optString(st.name)=="absent",onClick={day.put(st.name,"absent");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply()},label={Text("غایب")})}}
                 Button(
                     onClick = {
@@ -214,8 +232,13 @@ class MainActivity: ComponentActivity() {
             }
             7 -> {
                 Text("برنامه هفتگی",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-                Text("روز، ساعت، کلاس و درس را وارد کنید.")
-                OutlinedTextField(timetableEdit,{timetableEdit=it},modifier=Modifier.fillMaxWidth(),minLines=8,label={Text("شنبه تا پنجشنبه · ساعت · کلاس · درس")})
+                Text("هر ردیف را به شکل روز | ساعت | کلاس | درس وارد کنید. جدول پیش‌نمایش خودکار ساخته می‌شود.")
+                OutlinedTextField(timetableEdit,{timetableEdit=it},modifier=Modifier.fillMaxWidth(),minLines=6,label={Text("شنبه | ۸ تا ۹ | نهم ۱ | مطالعات")})
+                val timetableRows=timetableEdit.lines().mapNotNull{line->val p=line.split("|").map{it.trim()};if(p.size>=4&&p[0].isNotBlank())p else null}
+                if(timetableRows.isNotEmpty()) {
+                    Text("پیش‌نمایش جدول",fontWeight=FontWeight.Bold)
+                    timetableRows.forEach { row -> Card { Row(Modifier.fillMaxWidth().padding(8.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){row.take(4).forEach{Text(it,Modifier.weight(1f),style=MaterialTheme.typography.bodySmall)}} } }
+                }
                 Button(onClick={timetable=timetableEdit;prefs.edit().putString("timetable",timetable).apply();snackbar="برنامه هفتگی ذخیره شد."},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Save,"");Text("ذخیره برنامه")}
                 OutlinedButton(
                     onClick = {
@@ -344,6 +367,22 @@ class MainActivity: ComponentActivity() {
         if(avg!=null) Text(when{avg>=17->"عملکرد بسیار خوب؛ پیشنهاد: فعالیت‌های چالشی و تعمیقی.";avg>=14->"عملکرد خوب؛ مرور هدفمند نکات دشوار.";avg>=12->"عملکرد متوسط؛ تمرین تکمیلی توصیه می‌شود.";else->"نیازمند برنامه حمایتی، بررسی نقاط ضعف و پیگیری فردی."})
     } }
 }
+fun jalaliDateLabel(iso:String):String {
+    return try {
+        val p=iso.split("-"); if(p.size!=3)return iso
+        val gy=p[0].toInt(); val gm=p[1].toInt(); val gd=p[2].toInt()
+        val gdm=intArrayOf(0,31,59,90,120,151,181,212,243,273,304,334)
+        var gy2=gy-1600; val gm2=gm-1; val gd2=gd-1
+        var gdn=365*gy2+gy2/4-gy2/100+gy2/400+gdm[gm2]+gd2
+        if(gm>2 && gy%4==0 && (gy%100!=0 || gy%400==0)) gdn++
+        var jdn=gdn-79; val jnp=jdn/12053; jdn%=12053
+        var jy=979+33*jnp+4*(jdn/1461); jdn%=1461
+        if(jdn>=366){jy+=(jdn-1)/365;jdn=(jdn-1)%365}
+        val jm=if(jdn<186)1+jdn/31 else 7+(jdn-186)/30
+        val jd=if(jdn<186)1+jdn%31 else 1+(jdn-186)%30
+        String.format(Locale("fa"),"%04d/%02d/%02d",jy,jm,jd)
+    } catch(_:Exception) { iso }
+}
 fun average(scores:Map<String,Float>):Float?=scores.values.takeIf{it.isNotEmpty()}?.average()?.toFloat()
 fun parseVoice(text:String):Pair<String,Float>?{
     val nums=Regex("""\d+(?:[٫.]\d+)?""").findAll(text).mapNotNull{it.value.replace('٫','.').toFloatOrNull()}.toList()
@@ -364,7 +403,7 @@ $task
 خروجی فارسی، منظم و کاربردی باشد؛ منابع و لینک‌های بررسی‌شده و میزان اطمینان را ذکر کن."""
         val body=JSONObject().put("model","openai/gpt-oss-120b")
             .put("messages",JSONArray().put(JSONObject().put("role","system").put("content","دستیار پژوهش آموزشی و طراحی درس؛ جستجوی وب را انجام بده و از جعل منابع پرهیز کن.")).put(JSONObject().put("role","user").put("content",prompt)))
-            .put("tools",JSONArray().put(JSONObject().put("type","browser_search"))).put("tool_choice","required").put("temperature",0.3).put("max_completion_tokens",6000)
+            .put("temperature",0.3).put("max_completion_tokens",6000)
         conn.outputStream.use{it.write(body.toString().toByteArray(Charsets.UTF_8))}
         val code=conn.responseCode;val raw=(if(code in 200..299)conn.inputStream else conn.errorStream)?.bufferedReader()?.use{it.readText()} ?: ""
         if(code !in 200..299){val err=try{JSONObject(raw).optJSONObject("error")?.optString("message").orEmpty()}catch(_:Exception){""};when(code){401->"کلید Groq معتبر نیست.";403->"دسترسی به جستجوی وب یا مدل مجاز نیست.";429->"محدودیت درخواست Groq؛ کمی بعد تلاش کنید.";else->"خطای Groq ($code): ${err.ifBlank{"درخواست ناموفق"}}"}}
