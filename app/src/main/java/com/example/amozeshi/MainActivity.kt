@@ -157,7 +157,9 @@ class MainActivity: ComponentActivity() {
                         Button(onClick={
                             if(lessonRequest.isBlank()){snackbar="موضوع یا مشخصات کتاب را وارد کنید.";return@Button}
                             lessonLoading=true;lessonOutput=""
-                            scope.launch{lessonOutput=if(apiKey.isNotBlank())generateLessonWithGroq(apiKey,lessonRequest,"lesson") else lessonTemplate(lessonRequest)+"\\n\\nبرای استفاده از جستجوی کتاب و هوش مصنوعی، کلید Groq را در تنظیمات وارد کنید.";lessonLoading=false}
+                            scope.launch{lessonOutput=if(apiKey.isNotBlank())generateLessonWithGroq(apiKey,lessonRequest,"lesson") else lessonTemplate(lessonRequest)+"
+
+برای استفاده از جستجوی کتاب و هوش مصنوعی، کلید Groq را در تنظیمات وارد کنید.";lessonLoading=false}
                         },modifier=Modifier.weight(1f),enabled=!lessonLoading){Icon(Icons.Default.MenuBook,"");Text("طرح درس")}
                         OutlinedButton(onClick={
                             if(lessonRequest.isBlank()){snackbar="موضوع آزمون را وارد کنید.";return@OutlinedButton}
