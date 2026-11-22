@@ -84,7 +84,7 @@ class MainActivity: ComponentActivity() {
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             when(selectedTab) {
-                0 -> HomeScreen(students,columns,onNavigate={selectedTab=it},selectedClass,selectedSubject)
+                0 -> HomeScreen(students,columns,onNavigate={selectedTab=it},selectedClass,selectedSubject,onSelectClass={selectedClass=it;selectedSubject=students.filter{st->st.clazz==it}.map{st->st.subject}.distinct().firstOrNull() ?: selectedSubject})
                 1 -> {
                     Text("مدیریت کلاس‌ها",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
                     OutlinedTextField(nameInput,{nameInput=it},label={Text("نام دانش‌آموز")},modifier=Modifier.fillMaxWidth())
@@ -236,71 +236,46 @@ class MainActivity: ComponentActivity() {
     }
 }
 
-@Composable fun HomeScreen(students:List<Student>,columns:List<ScoreColumn>,onNavigate:(Int)->Unit,clazz:String,subject:String){
+@Composable fun HomeScreen(students:List<Student>,columns:List<ScoreColumn>,onNavigate:(Int)->Unit,clazz:String,subject:String,onSelectClass:(String)->Unit){
+    val classes=students.groupBy{it.clazz}.toSortedMap()
     Column(verticalArrangement=Arrangement.spacedBy(18.dp)) {
-        Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
-            Text("سلام، معلم عزیز 👋",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.onBackground)
-            Text("همه ابزارهای کلاس شما، یکجا.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("سلام، معلم عزیز 👋",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+        Text("کلاس‌های شما",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+        if(classes.isEmpty()) {
+            Card { Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text("هنوز کلاسی ثبت نشده است.")
+                Button(onClick={onNavigate(1)}){Text("افزودن دانش‌آموز و کلاس")}
+            } }
         }
-        Card(modifier=Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primary),shape=MaterialTheme.shapes.extraLarge) {
-            Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-                Row(verticalAlignment=Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("کلاس فعال",color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.75f),style=MaterialTheme.typography.labelLarge)
-                        Text(clazz,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.headlineMedium,color=MaterialTheme.colorScheme.onPrimary)
-                        Text(subject,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.9f))
-                    }
-                    Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.12f)) {
-                        Icon(Icons.Default.School,null,Modifier.padding(14.dp).size(36.dp),tint=MaterialTheme.colorScheme.onPrimary)
-                    }
-                }
-                Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                    Surface(color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.13f),shape=MaterialTheme.shapes.large) {
-                        Row(Modifier.padding(horizontal=14.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically) {
-                            Icon(Icons.Default.Groups,null,tint=MaterialTheme.colorScheme.onPrimary)
-                            Spacer(Modifier.width(8.dp))
-                            Text("${students.size} دانش‌آموز",color=MaterialTheme.colorScheme.onPrimary,fontWeight=FontWeight.SemiBold)
+        classes.forEach{(className,roster)->
+            val subjects=roster.map{it.subject}.distinct()
+            Card(modifier=Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.large) {
+                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(className,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleLarge)
+                            Text("${roster.size} دانش‌آموز · ${subjects.size} درس",color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                        Icon(Icons.Default.Groups,null,tint=MaterialTheme.colorScheme.primary)
                     }
-                    Surface(color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.13f),shape=MaterialTheme.shapes.large) {
-                        Row(Modifier.padding(horizontal=14.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically) {
-                            Icon(Icons.Default.Assignment,null,tint=MaterialTheme.colorScheme.onPrimary)
-                            Spacer(Modifier.width(8.dp))
-                            Text("${columns.size} ستون نمره",color=MaterialTheme.colorScheme.onPrimary,fontWeight=FontWeight.SemiBold)
-                        }
+                    subjects.forEach{lesson->Text("• $lesson",style=MaterialTheme.typography.bodyMedium)}
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick={onSelectClass(className);onNavigate(2)},modifier=Modifier.weight(1f)){Text("نمرات")}
+                        OutlinedButton(onClick={onSelectClass(className);onNavigate(3)},modifier=Modifier.weight(1f)){Text("تحلیل")}
                     }
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick={onSelectClass(className);onNavigate(6)},modifier=Modifier.weight(1f)){Text("حضور")}
+                        OutlinedButton(onClick={onSelectClass(className);onNavigate(7)},modifier=Modifier.weight(1f)){Text("برنامه")}
+                    }
+                    OutlinedButton(onClick={onSelectClass(className);onNavigate(1)},modifier=Modifier.fillMaxWidth()){Text("مدیریت دانش‌آموزان")}
                 }
             }
         }
-        Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-            DashboardStat("دانش‌آموزان",students.size.toString(),Icons.Default.Groups,Modifier.weight(1f))
-            DashboardStat("ستون‌های نمره",columns.size.toString(),Icons.Default.Assignment,Modifier.weight(1f))
-        }
+        Button(onClick={onNavigate(1)},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.PersonAdd,"");Text("افزودن کلاس / دانش‌آموز")}
         Text("دسترسی سریع",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-        val tiles=listOf(
-            Triple("مدیریت کلاس","فهرست و اطلاعات دانش‌آموزان",Icons.Default.Groups) to 1,
-            Triple("دفتر نمرات","ثبت و ویرایش نمره‌ها",Icons.Default.Assignment) to 2,
-            Triple("تحلیل عملکرد","ارزیابی و شناسایی نیازها",Icons.Default.Insights) to 3,
-            Triple("دستیار طرح درس","ساخت طرح درس هوشمند",Icons.Default.AutoAwesome) to 4,
-            Triple("تنظیمات","شخصی‌سازی دفتر نمرات",Icons.Default.Settings) to 5
-        )
-        tiles.chunked(2).forEach { row ->
-            Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                row.forEach { (tile,index) ->
-                    DashboardTile(tile.first,tile.second,tile.third,Modifier.weight(1f)){onNavigate(index)}
-                }
-                if(row.size==1) Spacer(Modifier.weight(1f))
-            }
-        }
-        Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer),shape=MaterialTheme.shapes.large) {
-            Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
-                Icon(Icons.Default.Lightbulb,null,tint=MaterialTheme.colorScheme.secondary)
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("نکته",fontWeight=FontWeight.Bold)
-                    Text("برای شروع، دانش‌آموزان کلاس را ثبت کنید و سپس دفتر نمرات را تکمیل کنید.",style=MaterialTheme.typography.bodySmall)
-                }
-            }
+        Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+            DashboardTile("طرح درس","طراحی آموزشی",Icons.Default.AutoAwesome,Modifier.weight(1f)){onNavigate(4)}
+            DashboardTile("تنظیمات","مدیریت تنظیمات",Icons.Default.Settings,Modifier.weight(1f)){onNavigate(5)}
         }
     }
 }
