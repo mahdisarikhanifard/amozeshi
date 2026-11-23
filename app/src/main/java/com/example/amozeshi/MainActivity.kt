@@ -209,7 +209,25 @@ class MainActivity: ComponentActivity() {
                         scope.launch{val config="\nتنظیمات آزمون: نوع سؤال="+quizTypes.joinToString("، ")+"؛ تعداد="+counts.joinToString("، "){it.first+" "+it.second}+"؛ دشواری="+quizDifficulty+"؛ پاسخنامه="+if(quizAnswerKey)"همراه آزمون" else "بدون پاسخنامه";lessonOutput=if(apiKey.isNotBlank())generateLessonWithGroq(apiKey,lessonRequest+config,"quiz") else "برای آزمون‌سازی هوشمند، کلید Groq را در تنظیمات وارد کنید.";lessonLoading=false}
                     },modifier=Modifier.fillMaxWidth(),enabled=!lessonLoading){Text("شروع ساخت آزمون")}
                     if(lessonLoading)LinearProgressIndicator(Modifier.fillMaxWidth())
-                    if(lessonOutput.isNotBlank())Card{Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text(lessonOutput);Button(onClick={ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,lessonOutput)},"اشتراک خروجی آموزشی"))}){Icon(Icons.Default.Share,"");Text("اشتراک‌گذاری / چاپ")}}}
+                    if (lessonOutput.isNotBlank()) {
+                        Card {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(lessonOutput)
+                                Button(
+                                    onClick = {
+                                        val send = Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_TEXT, lessonOutput)
+                                        }
+                                        ctx.startActivity(Intent.createChooser(send, "اشتراک خروجی آموزشی"))
+                                    }
+                                ) {
+                                    Icon(Icons.Default.Share, "")
+                                    Text("اشتراک‌گذاری / چاپ")
+                                }
+                            }
+                        }
+                    }
                     Text("جستجو و تحلیل داخل برنامه انجام می‌شود؛ مرورگر گوشی باز نمی‌شود. در صورت پیدا نشدن متن رسمی کتاب، خروجی این موضوع را شفاف اعلام می‌کند.",style=MaterialTheme.typography.bodySmall)
                 }
                 5 -> {
