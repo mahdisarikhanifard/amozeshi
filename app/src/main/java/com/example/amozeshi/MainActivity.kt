@@ -58,6 +58,10 @@ class MainActivity: ComponentActivity() {
     var newColumn by remember { mutableStateOf("") }
     var lessonRequest by remember { mutableStateOf("") }
     var lessonOutput by remember { mutableStateOf("") }
+    var quizTypes by remember { mutableStateOf(setOf("چهارگزینه‌ای","تشریحی")) }
+    var quizCounts by remember { mutableStateOf(mapOf("چهارگزینه‌ای" to "5","تشریحی" to "3","صحیح و غلط" to "0","جای خالی" to "0")) }
+    var quizDifficulty by remember { mutableStateOf("ترکیبی") }
+    var quizAnswerKey by remember { mutableStateOf(true) }
     var speechText by remember { mutableStateOf("") }
     var speechColumn by remember { mutableStateOf("") }
     var snackbar by remember { mutableStateOf("") }
@@ -177,6 +181,13 @@ class MainActivity: ComponentActivity() {
                     Text("دستیار آموزشی هوشمند",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
                     Text("طرح درس و آزمون متناسب با کتاب و پایه",style=MaterialTheme.typography.bodyMedium)
                     OutlinedTextField(lessonRequest,{lessonRequest=it},label={Text("کتاب، پایه، فصل یا موضوع")},modifier=Modifier.fillMaxWidth(),minLines=2)
+                    Text("تنظیمات آزمون",fontWeight=FontWeight.Bold)
+                    Text("نوع سؤال (چند انتخاب)",style=MaterialTheme.typography.bodyMedium)
+                    listOf("چهارگزینه‌ای","تشریحی","صحیح و غلط","جای خالی").forEach { type -> FilterChip(selected=type in quizTypes,onClick={quizTypes=if(type in quizTypes)quizTypes-type else quizTypes+type},label={Text(type)}) }
+                    quizTypes.forEach { type -> OutlinedTextField(value=quizCounts[type]?: "1",onValueChange={v->quizCounts=quizCounts+(type to normalizeDigits(v).filter{it.isDigit()}.take(2))},label={Text("تعداد سؤال $type")},singleLine=true,modifier=Modifier.fillMaxWidth()) }
+                    Text("درجه سختی",fontWeight=FontWeight.Bold)
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("آسان","متوسط","دشوار","ترکیبی").forEach{d->FilterChip(selected=quizDifficulty==d,onClick={quizDifficulty=d},label={Text(d)})}}
+                    Row(verticalAlignment=Alignment.CenterVertically){Checkbox(checked=quizAnswerKey,onCheckedChange={quizAnswerKey=it});Text("پاسخنامه و بارم‌بندی")}
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                         Button(onClick={
                             if(lessonRequest.isBlank()){snackbar="موضوع یا مشخصات کتاب را وارد کنید.";return@Button}
@@ -186,7 +197,7 @@ class MainActivity: ComponentActivity() {
                         OutlinedButton(onClick={
                             if(lessonRequest.isBlank()){snackbar="موضوع آزمون را وارد کنید.";return@OutlinedButton}
                             lessonLoading=true;lessonOutput=""
-                            scope.launch{lessonOutput=if(apiKey.isNotBlank())generateLessonWithGroq(apiKey,lessonRequest,"quiz") else "برای آزمون‌سازی هوشمند، کلید Groq را در تنظیمات وارد کنید.";lessonLoading=false}
+                            scope.launch{val config="\nتنظیمات آزمون: نوع سؤال="+quizTypes.joinToString("، ")+"؛ تعداد="+quizTypes.joinToString("، "){it+" "+(quizCounts[it]?: "1")}+"؛ دشواری="+quizDifficulty+"؛ پاسخنامه="+if(quizAnswerKey)"همراه آزمون" else "بدون پاسخنامه";lessonOutput=if(apiKey.isNotBlank())generateLessonWithGroq(apiKey,lessonRequest+config,"quiz") else "برای آزمون‌سازی هوشمند، کلید Groq را در تنظیمات وارد کنید.";lessonLoading=false}
                         },modifier=Modifier.weight(1f),enabled=!lessonLoading){Icon(Icons.Default.Assignment,"");Text("آزمون‌ساز")}
                     }
                     if(lessonLoading)LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -460,7 +471,7 @@ suspend fun generateLessonWithGroq(apiKey:String,request:String,mode:String="les
         val conn=(java.net.URL("https://api.groq.com/openai/v1/chat/completions").openConnection() as java.net.HttpURLConnection)
         conn.requestMethod="POST";conn.connectTimeout=30000;conn.readTimeout=120000;conn.doOutput=true
         conn.setRequestProperty("Content-Type","application/json");conn.setRequestProperty("Authorization","Bearer ${apiKey.trim()}")
-        val task=if(mode=="quiz")"""برای این موضوع آزمون استاندارد بساز: ۱۰ سؤال متنوع شامل چهارگزینه‌ای، صحیح/غلط، پاسخ کوتاه و تشریحی. پاسخنامه و بارم‌بندی را جداگانه بنویس. سطح سؤال‌ها آسان تا دشوار باشد و مطالب تأییدنشده را به کتاب نسبت نده.""" else """طرح درس حرفه‌ای تولید کن: اهداف رفتاری، پیش‌نیاز، وسایل، ایجاد انگیزه، مراحل تدریس با زمان، فعالیت معلم و دانش‌آموز، مثال‌های کتاب، ارزشیابی آغازین/تکوینی/پایانی، تکلیف و تمایز آموزشی برای دانش‌آموزان ضعیف و قوی. برای ریاضی حل مثال‌ها مرحله‌به‌مرحله و مناسب پایه باشد."""
+        val task=if(mode=="quiz")"""بر اساس تنظیمات آزمون که در درخواست آمده، آزمون بساز. دقیقاً نوع سؤال‌های انتخاب‌شده و تعداد تعیین‌شده برای هر نوع را رعایت کن؛ هیچ سؤال اضافی یا نوع انتخاب‌نشده تولید نکن. درجه دشواری انتخاب‌شده را در همه سؤال‌ها رعایت کن. اگر پاسخنامه درخواست شده، آن را در بخش جداگانه با پاسخ صحیح، پاسخ تشریحی کوتاه و بارم هر سؤال ارائه کن؛ در غیر این صورت پاسخ‌ها را نمایش نده. خروجی مختصر، مرتب و بدون مقدمه طولانی باشد. مطالب تأییدنشده را به کتاب نسبت نده.""" else """طرح درس حرفه‌ای تولید کن: اهداف رفتاری، پیش‌نیاز، وسایل، ایجاد انگیزه، مراحل تدریس با زمان، فعالیت معلم و دانش‌آموز، مثال‌های کتاب، ارزشیابی آغازین/تکوینی/پایانی، تکلیف و تمایز آموزشی برای دانش‌آموزان ضعیف و قوی. برای ریاضی حل مثال‌ها مرحله‌به‌مرحله و مناسب پایه باشد."""
         val prompt="""درخواست: $request
 ابتدا با browser_search کتاب رسمی آموزش‌وپرورش ایران، PDF کتاب و منابع معتبر مانند chap.sch.ir و رشد را جستجو کن. پایه، عنوان فصل و درس و محتوای دقیق را تطبیق بده. فقط محتوای بررسی‌شده را به کتاب نسبت بده. اگر متن یا منبع دقیق پیدا نشد، صریح بنویس «متن دقیق کتاب تأیید نشد» و محتوای عمومی را از مطالب کتاب جدا کن؛ هیچ صفحه، تمرین یا مثال ساختگی نکن. اگر مشخصات مبهم است، ابهام را اعلام کن.
 $task
