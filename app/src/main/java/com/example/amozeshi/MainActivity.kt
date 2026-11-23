@@ -63,7 +63,7 @@ class MainActivity: ComponentActivity() {
     var editStudent by remember { mutableStateOf<Student?>(null) }
     val scope=rememberCoroutineScope()
     var lessonLoading by remember { mutableStateOf(false) }
-    fun persist(studentData:List<Student> = students, columnData:List<ScoreColumn> = columns) { prefs.edit().putString("students",saveStudents(studentData)).putString("columns",saveColumns(columnData)).apply() }
+    fun persist(studentData:List<Student> = students, columnData:List<ScoreColumn> = columns) { prefs.edit().putString("students",saveStudents(studentData)).putString("columns",saveColumns(columnData)).apply(); autoBackup(prefs,studentData,columnData,attendance,timetable) }
     val speechLauncher=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val spoken=result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty()
         speechText=spoken
@@ -425,6 +425,8 @@ fun jalaliDateLabel(iso:String):String {
         String.format(Locale("fa"),"%04d/%02d/%02d",jy,jm,jd)
     } catch(_:Exception) { iso }
 }
+fun makeBackup(students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String):String = JSONObject().put("app","YarMoallem").put("version",2).put("createdAt",java.time.Instant.now().toString()).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).put("attendance",JSONObject(attendance.toString())).put("timetable",timetable).toString(2)
+fun autoBackup(prefs:android.content.SharedPreferences,students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String){try{val json=makeBackup(students,columns,attendance,timetable);val e=prefs.edit().putString("auto_backup_latest",json).putString("auto_backup_time",java.time.Instant.now().toString());for(i in 6 downTo 1){val old=prefs.getString("auto_backup_"+i,null);if(old!=null)e.putString("auto_backup_"+(i+1),old)};e.putString("auto_backup_1",json).apply()}catch(_:Exception){}}
 fun average(scores:Map<String,Float>):Float?=scores.values.takeIf{it.isNotEmpty()}?.average()?.toFloat()
 fun parseVoice(text:String):Pair<String,Float>?{
     val nums=Regex("""\d+(?:[٫.]\d+)?""").findAll(text).mapNotNull{it.value.replace('٫','.').toFloatOrNull()}.toList()
