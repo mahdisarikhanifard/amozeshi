@@ -112,27 +112,43 @@ class MainActivity: ComponentActivity() {
             when(selectedTab) {
                 0 -> HomeScreen(students,columns,onNavigate={selectedTab=it},selectedClass,selectedSubject,onSelectClass={selectedClass=it;selectedSubject=students.filter{st->st.clazz==it}.map{st->st.subject}.distinct().firstOrNull() ?: selectedSubject})
                 1 -> {
-                    Text("مدیریت کلاس‌ها",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-                    OutlinedTextField(nameInput,{nameInput=it},label={Text("نام دانش‌آموز")},modifier=Modifier.fillMaxWidth())
-                    OutlinedTextField(classInput,{classInput=it},label={Text("کلاس / پایه")},modifier=Modifier.fillMaxWidth())
-                    OutlinedTextField(subjectInput,{subjectInput=it},label={Text("درس")},modifier=Modifier.fillMaxWidth())
-                    Button(onClick={if(nameInput.isNotBlank()&&classInput.isNotBlank()&&subjectInput.isNotBlank()){
-                        val exists=students.any{it.name.equals(nameInput.trim(),true)&&it.clazz==classInput.trim()&&it.subject==subjectInput.trim()}
-                        if(!exists){students=students+Student(nameInput.trim(),classInput.trim(),subjectInput.trim(),emptyMap());persist();snackbar="دانش‌آموز ثبت شد."}else snackbar="این دانش‌آموز قبلاً ثبت شده است."
-                        nameInput=""
-                    }},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.PersonAdd,"");Text("ثبت دانش‌آموز")}
-                    Text("کلاس‌ها و درس‌ها",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+                    Text("مدیریت کلاس‌ها", style=MaterialTheme.typography.headlineSmall, fontWeight=FontWeight.Bold)
+                    OutlinedTextField(nameInput, { nameInput=it }, label={Text("نام دانش‌آموز")}, modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(classInput, { classInput=it }, label={Text("کلاس / پایه")}, modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(subjectInput, { subjectInput=it }, label={Text("درس")}, modifier=Modifier.fillMaxWidth())
+                    Button(onClick={
+                        if(nameInput.isNotBlank() && classInput.isNotBlank() && subjectInput.isNotBlank()) {
+                            val exists=students.any{it.name.equals(nameInput.trim(),true)&&it.clazz==classInput.trim()&&it.subject==subjectInput.trim()}
+                            if(!exists) {
+                                students=students+Student(nameInput.trim(),classInput.trim(),subjectInput.trim(),emptyMap())
+                                persist()
+                                snackbar="دانش‌آموز ثبت شد."
+                            } else snackbar="این دانش‌آموز قبلاً ثبت شده است."
+                            nameInput=""
+                        }
+                    }, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.PersonAdd,""); Text("ثبت دانش‌آموز") }
+                    Text("کلاس‌ها و درس‌ها", style=MaterialTheme.typography.titleLarge, fontWeight=FontWeight.Bold)
                     students.groupBy{it.clazz to it.subject}.forEach{(group,list)->
-                        Card { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
-                            Text(group.first,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium);Text(group.second,color=MaterialTheme.colorScheme.primary)
-                            Text(list.size.toString()+" دانش‌آموز · "+list.count{it.scores.isNotEmpty()}+" دارای نمره")
+                        Card(modifier=Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(16.dp), verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                                Text(group.first, fontWeight=FontWeight.Bold, style=MaterialTheme.typography.titleMedium)
+                                Text(group.second, color=MaterialTheme.colorScheme.primary)
+                                Text("${list.size} دانش‌آموز · ${list.count{it.scores.isNotEmpty()}} دارای نمره")
+                                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick={selectedClass=group.first;selectedSubject=group.second;selectedTab=2}, modifier=Modifier.weight(1f)){Text("دفتر نمرات")}
+                                    OutlinedButton(onClick={selectedClass=group.first;selectedSubject=group.second;selectedTab=3}, modifier=Modifier.weight(1f)){Text("تحلیل")}
+                                }
+                                list.forEach{st->
+                                    Row(verticalAlignment=Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(st.name,fontWeight=FontWeight.SemiBold)
+                                            Text("میانگین: "+(average(st.scores)?.let{"%.2f".format(it)}?: "—"))
+                                        }
+                                        IconButton(onClick={students=students.filterNot{it==st};persist()}){Icon(Icons.Default.Delete,"حذف")}
+                                    }
+                                }
                             }
-                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                                OutlinedButton(onClick={selectedClass=group.first;selectedSubject=group.second;selectedTab=2},modifier=Modifier.weight(1f)){Text("دفتر نمرات")}
-                                OutlinedButton(onClick={selectedClass=group.first;selectedSubject=group.second;selectedTab=3},modifier=Modifier.weight(1f)){Text("تحلیل")}
-                            }
-                            list.forEach{st->Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(st.name,fontWeight=FontWeight.SemiBold);Text("میانگین: "+(average(st.scores)?.let{"%.2f".format(it)}?: "—"))};IconButton(onClick={students=students.filterNot{it==st};persist()}){Icon(Icons.Default.Delete,"حذف")}}}
-                        }}
+                        }
                     }
                 }
                 2 -> {
