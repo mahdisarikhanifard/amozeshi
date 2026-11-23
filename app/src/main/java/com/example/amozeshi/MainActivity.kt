@@ -314,7 +314,6 @@ class MainActivity: ComponentActivity() {
                     Text("اشتراک برنامه")
                 }
             }
-            }
             if(snackbar.isNotBlank()) Text(snackbar,color=MaterialTheme.colorScheme.primary)
         }
     }
@@ -465,7 +464,7 @@ fun jalaliDateLabel(iso:String):String {
 }
 fun normalizeDigits(s:String):String { val p="۰۱۲۳۴۵۶۷۸۹";val a="٠١٢٣٤٥٦٧٨٩";return s.map{ch->when{ch in p->(ch.code-p[0].code).toString();ch in a->(ch.code-a[0].code).toString();else->ch.toString()}}.joinToString("") }
 fun makeBackup(students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String,apiKey:String):String = JSONObject().put("app","YarMoallem").put("version",3).put("apiKey",apiKey).put("createdAt",java.time.Instant.now().toString()).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).put("attendance",JSONObject(attendance.toString())).put("timetable",timetable).toString(2)
-fun autoBackup(prefs:android.content.SharedPreferences,students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String){try{val json=makeBackup(students,columns,attendance,timetable);val e=prefs.edit().putString("auto_backup_latest",json).putString("auto_backup_time",java.time.Instant.now().toString());for(i in 6 downTo 1){val old=prefs.getString("auto_backup_"+i,null);if(old!=null)e.putString("auto_backup_"+(i+1),old)};e.putString("auto_backup_1",json).apply()}catch(_:Exception){}}
+fun autoBackup(prefs:android.content.SharedPreferences,students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String){try{val json=makeBackup(students,columns,attendance,timetable,prefs.getString("api_key","") ?: "");val e=prefs.edit().putString("auto_backup_latest",json).putString("auto_backup_time",java.time.Instant.now().toString());for(i in 6 downTo 1){val old=prefs.getString("auto_backup_"+i,null);if(old!=null)e.putString("auto_backup_"+(i+1),old)};e.putString("auto_backup_1",json).apply()}catch(_:Exception){}}
 fun average(scores:Map<String,Float>):Float?=scores.values.takeIf{it.isNotEmpty()}?.average()?.toFloat()
 fun parseVoice(text:String):Pair<String,Float>?{
     val nums=Regex("""\d+(?:[٫.]\d+)?""").findAll(text).mapNotNull{it.value.replace('٫','.').toFloatOrNull()}.toList()
