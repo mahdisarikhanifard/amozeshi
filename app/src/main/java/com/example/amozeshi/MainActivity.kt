@@ -238,7 +238,6 @@ class MainActivity: ComponentActivity() {
                     }
                     Text("اطلاعات دانش‌آموزان روی همین دستگاه ذخیره می‌شود.")
                 }
-            }
             6 -> {
                 Text("حضور و غیاب",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
                 val attendanceClasses=students.map{it.clazz}.distinct().sorted()
