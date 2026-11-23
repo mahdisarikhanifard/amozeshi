@@ -191,6 +191,7 @@ class MainActivity: ComponentActivity() {
                     Text("درجه سختی",fontWeight=FontWeight.Bold)
                     Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("آسان","متوسط","دشوار","ترکیبی").forEach{d->FilterChip(selected=quizDifficulty==d,onClick={quizDifficulty=d},label={Text(d)})}}
                     Row(verticalAlignment=Alignment.CenterVertically){Checkbox(checked=quizAnswerKey,onCheckedChange={quizAnswerKey=it});Text("پاسخنامه و بارم‌بندی")}
+                    }
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                         Button(onClick={
                             if(lessonRequest.isBlank()){snackbar="موضوع یا مشخصات کتاب را وارد کنید.";return@Button}
