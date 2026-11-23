@@ -64,6 +64,24 @@ class MainActivity: ComponentActivity() {
     var apiKey by remember { mutableStateOf(prefs.getString("api_key","") ?: "") }
     var editStudent by remember { mutableStateOf<Student?>(null) }
     val scope=rememberCoroutineScope()
+    val exportLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if(uri!=null) try { ctx.contentResolver.openOutputStream(uri)?.use { it.write(makeBackup(students,columns,attendance,timetable).toByteArray(Charsets.UTF_8)) }; snackbar="فایل پشتیبان ذخیره شد." } catch(e:Exception){snackbar="ذخیره پشتیبان ناموفق بود: ${e.message}"}
+    }
+    val importLauncher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if(uri!=null) try {
+            val raw=ctx.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use{it.readText()} ?: error("فایل قابل خواندن نیست")
+            val root=JSONObject(raw)
+            require(root.optString("app")=="YarMoallem") {"فایل پشتیبان یار معلم نیست"}
+            val newStudents=loadStudents(root.getJSONArray("students").toString())
+            val newColumns=loadColumns(root.getJSONArray("columns").toString())
+            val newAttendance=root.optJSONObject("attendance") ?: JSONObject()
+            val newTimetable=root.optString("timetable","")
+            students=newStudents;columns=newColumns;attendance=newAttendance;timetable=newTimetable;timetableEdit=newTimetable
+            prefs.edit().putString("students",saveStudents(newStudents)).putString("columns",saveColumns(newColumns)).putString("attendance",newAttendance.toString()).putString("timetable",newTimetable).apply()
+            autoBackup(prefs,newStudents,newColumns,newAttendance,newTimetable)
+            snackbar="بازیابی کامل شد؛ ${newStudents.size} دانش‌آموز بازیابی شد."
+        } catch(e:Exception){snackbar="بازیابی انجام نشد؛ اطلاعات قبلی حفظ شد. ${e.message}"}
+    }
     var lessonLoading by remember { mutableStateOf(false) }
     fun persist(studentData:List<Student> = students, columnData:List<ScoreColumn> = columns) { prefs.edit().putString("students",saveStudents(studentData)).putString("columns",saveColumns(columnData)).apply(); autoBackup(prefs,studentData,columnData,attendance,timetable) }
     val speechLauncher=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -192,11 +210,10 @@ class MainActivity: ComponentActivity() {
                             }
                             "هوش مصنوعی" -> OutlinedTextField(apiKey,{apiKey=it;prefs.edit().putString("api_key",it).apply()},label={Text("کلید API Groq")},modifier=Modifier.fillMaxWidth())
                             "پشتیبان‌گیری" -> {
-                                Button(onClick={
-                                    val backup=JSONObject().put("app","YarMoallem").put("version",1).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).put("attendance",attendance).put("timetable",timetable).toString(2)
-                                    ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="application/json";putExtra(Intent.EXTRA_SUBJECT,"پشتیبان یار معلم");putExtra(Intent.EXTRA_TEXT,backup)},"ذخیره یا ارسال نسخه پشتیبان"))
-                                },modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Backup,"");Text("خروجی پشتیبان اطلاعات")}
-                                Text("پشتیبان شامل دانش‌آموزان، نمرات، حضور و غیاب و برنامه هفتگی است.")
+                                Button(onClick={exportLauncher.launch("YarMoallem_Backup_${java.time.LocalDate.now()}.json")},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Backup,"");Text("ذخیره فایل پشتیبان")}
+                                Button(onClick={importLauncher.launch(arrayOf("application/json","text/*"))},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Restore,"");Text("بازیابی از فایل پشتیبان")}
+                                Text("پشتیبان شامل دانش‌آموزان، تمام نمرات، ستون‌های نمره، حضور و غیاب و برنامه هفتگی است. هنگام بازیابی، اطلاعات فعلی با فایل انتخابی جایگزین می‌شود.")
+                                Text("پشتیبان خودکار داخلی نیز پس از تغییرات مهم ذخیره می‌شود.",style=MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
