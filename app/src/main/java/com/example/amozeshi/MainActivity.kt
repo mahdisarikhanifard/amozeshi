@@ -21,6 +21,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -33,7 +35,7 @@ data class Student(val name:String, val clazz:String, val subject:String, val sc
 data class ScoreColumn(val name:String, val max:Float=20f, val weight:Float=1f)
 
 class MainActivity: ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { YarMoallemTheme { App() } } }
+    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { YarMoallemTheme { CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) { App() } } } }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -126,7 +128,7 @@ class MainActivity: ComponentActivity() {
                     Button(onClick={startSpeech()},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Mic,"");Text("ثبت نمره با صوت")}
                     if(speechText.isNotBlank())Card{Column(Modifier.padding(12.dp)){Text(speechText);Button(onClick={val parsed=parseVoice(speechText);val target=parsed?.let{p->roster.firstOrNull{it.name.contains(p.first,true)}};if(parsed!=null&&target!=null){val updated=students.map{if(it==target)it.copy(scores=it.scores+(speechColumn to parsed.second))else it};students=updated;persist(updated);snackbar="نمره ثبت شد."}else snackbar="نام دانش‌آموز را بررسی کنید.";speechText=""}){Text("تأیید و ثبت")}}}
                     roster.forEach{st->Card{Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(st.name,fontWeight=FontWeight.Bold);Text(st.clazz+" · "+st.subject)};Text(average(st.scores)?.let{"%.2f".format(it)}?: "—",fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary)}
-                    columns.forEach{c->val currentScore=st.scores[c.name];var v by remember(st.name,st.clazz,st.subject,c.name,currentScore){mutableStateOf(currentScore?.toString().orEmpty())};OutlinedTextField(value=v,onValueChange={input->v=input;val normalized=input.replace("٫",".").replace(",",".");val n=normalized.toFloatOrNull();if(n!=null&&n in 0f..c.max){val updated=students.map{row->if(row.name==st.name&&row.clazz==st.clazz&&row.subject==st.subject)row.copy(scores=row.scores+(c.name to n))else row};students=updated;persist(updated)}else if(input.isBlank()){val updated=students.map{row->if(row.name==st.name&&row.clazz==st.clazz&&row.subject==st.subject)row.copy(scores=row.scores-c.name)else row};students=updated;persist(updated)}},label={Text(c.name+" (از "+c.max+")")},singleLine=true,modifier=Modifier.fillMaxWidth())}
+                    columns.forEach{c->val currentScore=st.scores[c.name];var v by remember(st.name,st.clazz,st.subject,c.name,currentScore){mutableStateOf(currentScore?.toString().orEmpty())};OutlinedTextField(value=v,onValueChange={input->v=input;val normalized=normalizeDigits(input).replace("٫",".").replace(",",".");val n=normalized.toFloatOrNull();if(n!=null&&n in 0f..c.max){val updated=students.map{row->if(row.name==st.name&&row.clazz==st.clazz&&row.subject==st.subject)row.copy(scores=row.scores+(c.name to n))else row};students=updated;persist(updated)}else if(input.isBlank()){val updated=students.map{row->if(row.name==st.name&&row.clazz==st.clazz&&row.subject==st.subject)row.copy(scores=row.scores-c.name)else row};students=updated;persist(updated)}},label={Text(c.name+" (از "+c.max+")")},singleLine=true,modifier=Modifier.fillMaxWidth())}
                     Text(scoreStatus(average(st.scores)),color=MaterialTheme.colorScheme.secondary)
                     }}}
                     Button(onClick={shareGradebook(ctx,selectedClass,selectedSubject,roster,columns)},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.FileDownload,"");Text("خروجی جدول در Word")}
@@ -231,7 +233,7 @@ class MainActivity: ComponentActivity() {
                 Text("سوابق ماه انتخاب‌شده",fontWeight=FontWeight.Bold)
                 val monthRecords=attendance.keys().asSequence().filter{it.startsWith(attendanceDate.take(7))}.sorted().toList()
                 if(monthRecords.isEmpty()) Text("در این ماه سابقه‌ای ثبت نشده است.") else monthRecords.forEach{dateKey->val rec=attendance.optJSONObject(dateKey)?:JSONObject();Card{Column(Modifier.padding(10.dp)){Text(jalaliDateLabel(dateKey),fontWeight=FontWeight.Bold);Text("حاضر: "+rec.keys().asSequence().count{rec.optString(it)=="present"}+" · غایب: "+rec.keys().asSequence().count{rec.optString(it)=="absent"})}}}
-                roster.forEach{st->Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically){Text(st.name,Modifier.weight(1f));FilterChip(selected=day.optString(st.name)=="present",onClick={day.put(st.name,"present");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply()},label={Text("حاضر")});Spacer(Modifier.width(6.dp));FilterChip(selected=day.optString(st.name)=="absent",onClick={day.put(st.name,"absent");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply()},label={Text("غایب")})}}
+                roster.forEach{st->Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically){Text(st.name,Modifier.weight(1f));FilterChip(selected=day.optString(st.name)=="present",onClick={day.put(st.name,"present");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply();autoBackup(prefs,students,columns,attendance,timetable)},label={Text("حاضر")});Spacer(Modifier.width(6.dp));FilterChip(selected=day.optString(st.name)=="absent",onClick={day.put(st.name,"absent");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply()},label={Text("غایب")})}}
                 Button(
                     onClick = {
                         val report = roster.joinToString("\n") { st ->
@@ -262,7 +264,7 @@ class MainActivity: ComponentActivity() {
                     Text("پیش‌نمایش جدول",fontWeight=FontWeight.Bold)
                     timetableRows.forEach { row -> Card { Row(Modifier.fillMaxWidth().padding(8.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){row.take(4).forEach{Text(it,Modifier.weight(1f),style=MaterialTheme.typography.bodySmall)}} } }
                 }
-                Button(onClick={timetable=timetableEdit;prefs.edit().putString("timetable",timetable).apply();snackbar="برنامه هفتگی ذخیره شد."},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Save,"");Text("ذخیره برنامه")}
+                Button(onClick={timetable=timetableEdit;prefs.edit().putString("timetable",timetable).apply();autoBackup(prefs,students,columns,attendance,timetable);snackbar="برنامه هفتگی ذخیره شد."},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Save,"");Text("ذخیره برنامه")}
                 OutlinedButton(
                     onClick = {
                         val sendIntent = Intent(Intent.ACTION_SEND).apply {
@@ -425,6 +427,7 @@ fun jalaliDateLabel(iso:String):String {
         String.format(Locale("fa"),"%04d/%02d/%02d",jy,jm,jd)
     } catch(_:Exception) { iso }
 }
+fun normalizeDigits(s:String):String { val p="۰۱۲۳۴۵۶۷۸۹";val a="٠١٢٣٤٥٦٧٨٩";return s.map{ch->when{ch in p->(ch.code-p[0].code).toString();ch in a->(ch.code-a[0].code).toString();else->ch.toString()}}.joinToString("") }
 fun makeBackup(students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String):String = JSONObject().put("app","YarMoallem").put("version",2).put("createdAt",java.time.Instant.now().toString()).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).put("attendance",JSONObject(attendance.toString())).put("timetable",timetable).toString(2)
 fun autoBackup(prefs:android.content.SharedPreferences,students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String){try{val json=makeBackup(students,columns,attendance,timetable);val e=prefs.edit().putString("auto_backup_latest",json).putString("auto_backup_time",java.time.Instant.now().toString());for(i in 6 downTo 1){val old=prefs.getString("auto_backup_"+i,null);if(old!=null)e.putString("auto_backup_"+(i+1),old)};e.putString("auto_backup_1",json).apply()}catch(_:Exception){}}
 fun average(scores:Map<String,Float>):Float?=scores.values.takeIf{it.isNotEmpty()}?.average()?.toFloat()
