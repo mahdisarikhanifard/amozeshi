@@ -58,6 +58,7 @@ class MainActivity: ComponentActivity() {
     var newColumn by remember { mutableStateOf("") }
     var lessonRequest by remember { mutableStateOf("") }
     var lessonOutput by remember { mutableStateOf("") }
+    var quizConfigOpen by remember { mutableStateOf(false) }
     var quizTypes by remember { mutableStateOf(setOf("چهارگزینه‌ای","تشریحی")) }
     var quizCounts by remember { mutableStateOf(mapOf("چهارگزینه‌ای" to "5","تشریحی" to "3","صحیح و غلط" to "0","جای خالی" to "0")) }
     var quizDifficulty by remember { mutableStateOf("ترکیبی") }
@@ -69,7 +70,7 @@ class MainActivity: ComponentActivity() {
     var editStudent by remember { mutableStateOf<Student?>(null) }
     val scope=rememberCoroutineScope()
     val exportLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        if(uri!=null) try { ctx.contentResolver.openOutputStream(uri)?.use { it.write(makeBackup(students,columns,attendance,timetable).toByteArray(Charsets.UTF_8)) }; snackbar="فایل پشتیبان ذخیره شد." } catch(e:Exception){snackbar="ذخیره پشتیبان ناموفق بود: ${e.message}"}
+        if(uri!=null) try { ctx.contentResolver.openOutputStream(uri)?.use { it.write(makeBackup(students,columns,attendance,timetable,apiKey).toByteArray(Charsets.UTF_8)) }; snackbar="فایل پشتیبان ذخیره شد." } catch(e:Exception){snackbar="ذخیره پشتیبان ناموفق بود: ${e.message}"}
     }
     val importLauncher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if(uri!=null) try {
@@ -80,8 +81,8 @@ class MainActivity: ComponentActivity() {
             val newColumns=loadColumns(root.getJSONArray("columns").toString())
             val newAttendance=root.optJSONObject("attendance") ?: JSONObject()
             val newTimetable=root.optString("timetable","")
-            students=newStudents;columns=newColumns;attendance=newAttendance;timetable=newTimetable;timetableEdit=newTimetable
-            prefs.edit().putString("students",saveStudents(newStudents)).putString("columns",saveColumns(newColumns)).putString("attendance",newAttendance.toString()).putString("timetable",newTimetable).apply()
+            students=newStudents;columns=newColumns;attendance=newAttendance;timetable=newTimetable;timetableEdit=newTimetable;apiKey=root.optString("apiKey",apiKey)
+            prefs.edit().putString("students",saveStudents(newStudents)).putString("columns",saveColumns(newColumns)).putString("attendance",newAttendance.toString()).putString("timetable",newTimetable).putString("api_key",apiKey).apply()
             autoBackup(prefs,newStudents,newColumns,newAttendance,newTimetable)
             snackbar="بازیابی کامل شد؛ ${newStudents.size} دانش‌آموز بازیابی شد."
         } catch(e:Exception){snackbar="بازیابی انجام نشد؛ اطلاعات قبلی حفظ شد. ${e.message}"}
@@ -125,7 +126,8 @@ class MainActivity: ComponentActivity() {
                         Card { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
                             Text(group.first,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium);Text(group.second,color=MaterialTheme.colorScheme.primary)
                             Text(list.size.toString()+" دانش‌آموز · "+list.count{it.scores.isNotEmpty()}+" دارای نمره")
-                            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                            }
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                                 OutlinedButton(onClick={selectedClass=group.first;selectedSubject=group.second;selectedTab=2},modifier=Modifier.weight(1f)){Text("دفتر نمرات")}
                                 OutlinedButton(onClick={selectedClass=group.first;selectedSubject=group.second;selectedTab=3},modifier=Modifier.weight(1f)){Text("تحلیل")}
                             }
@@ -181,6 +183,7 @@ class MainActivity: ComponentActivity() {
                     Text("دستیار آموزشی هوشمند",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
                     Text("طرح درس و آزمون متناسب با کتاب و پایه",style=MaterialTheme.typography.bodyMedium)
                     OutlinedTextField(lessonRequest,{lessonRequest=it},label={Text("کتاب، پایه، فصل یا موضوع")},modifier=Modifier.fillMaxWidth(),minLines=2)
+                    if(quizConfigOpen) {
                     Text("تنظیمات آزمون",fontWeight=FontWeight.Bold)
                     Text("نوع سؤال (چند انتخاب)",style=MaterialTheme.typography.bodyMedium)
                     listOf("چهارگزینه‌ای","تشریحی","صحیح و غلط","جای خالی").forEach { type -> FilterChip(selected=type in quizTypes,onClick={quizTypes=if(type in quizTypes)quizTypes-type else quizTypes+type},label={Text(type)}) }
@@ -194,12 +197,16 @@ class MainActivity: ComponentActivity() {
                             lessonLoading=true;lessonOutput=""
                             scope.launch{lessonOutput=if(apiKey.isNotBlank())generateLessonWithGroq(apiKey,lessonRequest,"lesson") else lessonTemplate(lessonRequest)+"\\n\\nبرای استفاده از جستجوی کتاب و هوش مصنوعی، کلید Groq را در تنظیمات وارد کنید.";lessonLoading=false}
                         },modifier=Modifier.weight(1f),enabled=!lessonLoading){Icon(Icons.Default.MenuBook,"");Text("طرح درس")}
-                        OutlinedButton(onClick={
-                            if(lessonRequest.isBlank()){snackbar="موضوع آزمون را وارد کنید.";return@OutlinedButton}
-                            lessonLoading=true;lessonOutput=""
-                            scope.launch{val config="\nتنظیمات آزمون: نوع سؤال="+quizTypes.joinToString("، ")+"؛ تعداد="+quizTypes.joinToString("، "){it+" "+(quizCounts[it]?: "1")}+"؛ دشواری="+quizDifficulty+"؛ پاسخنامه="+if(quizAnswerKey)"همراه آزمون" else "بدون پاسخنامه";lessonOutput=if(apiKey.isNotBlank())generateLessonWithGroq(apiKey,lessonRequest+config,"quiz") else "برای آزمون‌سازی هوشمند، کلید Groq را در تنظیمات وارد کنید.";lessonLoading=false}
-                        },modifier=Modifier.weight(1f),enabled=!lessonLoading){Icon(Icons.Default.Assignment,"");Text("آزمون‌ساز")}
+                        OutlinedButton(onClick={quizConfigOpen=!quizConfigOpen;lessonOutput=""},modifier=Modifier.weight(1f),enabled=!lessonLoading){Icon(Icons.Default.Assignment,"");Text(if(quizConfigOpen)"بستن تنظیمات" else "آزمون‌ساز")}
                     }
+                    if(quizConfigOpen) Button(onClick={
+                        if(lessonRequest.isBlank()){snackbar="موضوع آزمون را وارد کنید.";return@Button}
+                        if(quizTypes.isEmpty()){snackbar="حداقل یک نوع سؤال انتخاب کنید.";return@Button}
+                        val counts=quizTypes.map{it to (quizCounts[it]?.toIntOrNull()?:0)}
+                        if(counts.any{it.second<1}){snackbar="برای هر نوع سؤال انتخاب‌شده، تعداد معتبر وارد کنید.";return@Button}
+                        lessonLoading=true;lessonOutput="";quizConfigOpen=false
+                        scope.launch{val config="\nتنظیمات آزمون: نوع سؤال="+quizTypes.joinToString("، ")+"؛ تعداد="+counts.joinToString("، "){it.first+" "+it.second}+"؛ دشواری="+quizDifficulty+"؛ پاسخنامه="+if(quizAnswerKey)"همراه آزمون" else "بدون پاسخنامه";lessonOutput=if(apiKey.isNotBlank())generateLessonWithGroq(apiKey,lessonRequest+config,"quiz") else "برای آزمون‌سازی هوشمند، کلید Groq را در تنظیمات وارد کنید.";lessonLoading=false}
+                    },modifier=Modifier.fillMaxWidth(),enabled=!lessonLoading){Text("شروع ساخت آزمون")}
                     if(lessonLoading)LinearProgressIndicator(Modifier.fillMaxWidth())
                     if(lessonOutput.isNotBlank())Card{Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text(lessonOutput);Button(onClick={ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,lessonOutput)},"اشتراک خروجی آموزشی"))}){Icon(Icons.Default.Share,"");Text("اشتراک‌گذاری / چاپ")}}}
                     Text("جستجو و تحلیل داخل برنامه انجام می‌شود؛ مرورگر گوشی باز نمی‌شود. در صورت پیدا نشدن متن رسمی کتاب، خروجی این موضوع را شفاف اعلام می‌کند.",style=MaterialTheme.typography.bodySmall)
@@ -456,7 +463,7 @@ fun jalaliDateLabel(iso:String):String {
     } catch(_:Exception) { iso }
 }
 fun normalizeDigits(s:String):String { val p="۰۱۲۳۴۵۶۷۸۹";val a="٠١٢٣٤٥٦٧٨٩";return s.map{ch->when{ch in p->(ch.code-p[0].code).toString();ch in a->(ch.code-a[0].code).toString();else->ch.toString()}}.joinToString("") }
-fun makeBackup(students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String):String = JSONObject().put("app","YarMoallem").put("version",2).put("createdAt",java.time.Instant.now().toString()).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).put("attendance",JSONObject(attendance.toString())).put("timetable",timetable).toString(2)
+fun makeBackup(students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String,apiKey:String):String = JSONObject().put("app","YarMoallem").put("version",3).put("apiKey",apiKey).put("createdAt",java.time.Instant.now().toString()).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).put("attendance",JSONObject(attendance.toString())).put("timetable",timetable).toString(2)
 fun autoBackup(prefs:android.content.SharedPreferences,students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String){try{val json=makeBackup(students,columns,attendance,timetable);val e=prefs.edit().putString("auto_backup_latest",json).putString("auto_backup_time",java.time.Instant.now().toString());for(i in 6 downTo 1){val old=prefs.getString("auto_backup_"+i,null);if(old!=null)e.putString("auto_backup_"+(i+1),old)};e.putString("auto_backup_1",json).apply()}catch(_:Exception){}}
 fun average(scores:Map<String,Float>):Float?=scores.values.takeIf{it.isNotEmpty()}?.average()?.toFloat()
 fun parseVoice(text:String):Pair<String,Float>?{
