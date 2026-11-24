@@ -935,7 +935,7 @@ fun parseBackup(raw:String):BackupSnapshot {
         ScoreColumn(name)
     }
     require(parsedColumns.map{it.name}.distinct().size==parsedColumns.size) {"نام ستون‌های نمره تکراری است"}
-    val attendance=root.optJSONObject("attendance") ?: JSONObject()
+    val attendance=if(root.has("attendance")) root.optJSONObject("attendance") ?: throw IllegalArgumentException("ساختار حضور و غیاب در فایل پشتیبان معتبر نیست") else JSONObject()
     val dateKeys=attendance.keys()
     while(dateKeys.hasNext()) {
         val dateKey=dateKeys.next()
