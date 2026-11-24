@@ -153,7 +153,7 @@ class MainActivity: ComponentActivity() {
                 1 -> {
                     Text("مدیریت کلاس‌ها", style=MaterialTheme.typography.headlineSmall, fontWeight=FontWeight.Bold)
                     OutlinedTextField(nameInput, { nameInput=it }, label={Text("نام دانش‌آموز")}, modifier=Modifier.fillMaxWidth())
-                    OutlinedTextField(studentNumberInput, { studentNumberInput=it }, label={Text("شماره دانش‌آموزی")}, modifier=Modifier.fillMaxWidth(), singleLine=true)
+                    OutlinedTextField(studentNumberInput, { studentNumberInput=it }, label={Text("شماره دانش‌آموزی")}, modifier=Modifier.fillMaxWidth(), singleLine=true, textStyle=MaterialTheme.typography.bodyLarge.copy(textDirection=androidx.compose.ui.text.style.TextDirection.Ltr))
                     OutlinedTextField(classInput, { classInput=it }, label={Text("کلاس / پایه")}, modifier=Modifier.fillMaxWidth())
                     OutlinedTextField(subjectInput, { subjectInput=it }, label={Text("درس")}, modifier=Modifier.fillMaxWidth())
                     Button(onClick={
@@ -212,7 +212,7 @@ class MainActivity: ComponentActivity() {
                     ExposedDropdownMenuBox(expanded=colMenu,onExpandedChange={colMenu=it}){OutlinedTextField(speechColumn,{speechColumn=it},readOnly=true,label={Text("ستون ثبت صوتی")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(colMenu)},modifier=Modifier.fillMaxWidth().menuAnchor());ExposedDropdownMenu(expanded=colMenu,onDismissRequest={colMenu=false}){columns.forEach{DropdownMenuItem(text={Text(it.name)},onClick={speechColumn=it.name;colMenu=false})}}}
                     Button(onClick={startSpeech()},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Mic,"");Text("ثبت نمره با صوت")}
                     if(speechText.isNotBlank())Card{Column(Modifier.padding(12.dp)){Text(bidiNumbers(speechText));Button(onClick={val parsed=parseVoice(speechText);val target=parsed?.let{p->roster.firstOrNull{it.name.contains(p.first,true)}};if(parsed!=null&&target!=null){val updated=students.map{if(it==target)it.copy(scores=it.scores+(speechColumn to parsed.second))else it};if(persist(updated)){students=updated;snackbar="نمره ثبت و ذخیره شد."}}else snackbar="نام دانش‌آموز را بررسی کنید.";speechText=""}){Text("تأیید و ثبت")}}}
-                    roster.forEach{st->Card{Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(st.name,fontWeight=FontWeight.Bold);Text(st.clazz+" · "+st.subject)};Text(average(st.scores)?.let{bidiLtr("%.2f".format(it))}?: "—",fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary)}
+                    roster.forEach{st->Card{Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(st.name,fontWeight=FontWeight.Bold);Text(bidiNumbers(st.clazz+" · "+st.subject))};Text(average(st.scores)?.let{bidiLtr("%.2f".format(it))}?: "—",fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary)}
                     columns.forEach{c->
                         val currentScore=st.scores[c.name]
                         var v by remember(st.studentNumber,st.name,st.clazz,st.subject,c.name,currentScore){mutableStateOf(currentScore?.toString().orEmpty())}
@@ -234,6 +234,7 @@ class MainActivity: ComponentActivity() {
                             },
                             label={Text(c.name+" (از "+bidiLtr(c.max.toString())+")")},
                             singleLine=true,
+                            textStyle=MaterialTheme.typography.bodyLarge.copy(textDirection=androidx.compose.ui.text.style.TextDirection.Ltr),
                             modifier=Modifier.fillMaxWidth()
                         )
                     }
@@ -263,21 +264,21 @@ class MainActivity: ComponentActivity() {
                     val strongestColumn=columnAnalysis.filter{it.second!=null}.maxByOrNull{it.second!!}
                     val weakestColumn=columnAnalysis.filter{it.second!=null}.minByOrNull{it.second!!}
                     val high=report.count{(average(it.scores)?:-1f)>=17};val low=report.count{val a=average(it.scores);a!=null&&a<12};val missing=report.count{it.scores.isEmpty()}
-                    Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text(selectedClass+" · "+selectedSubject,fontWeight=FontWeight.Bold);Text(bidiNumbers("میانگین کلاس: "+(classAvg?.let{"%.2f از ۲۰".format(it)}?: "—")),style=MaterialTheme.typography.titleLarge);Text(bidiNumbers("میانه: "+(median?.let{"%.2f".format(it)}?: "—")+" | پوشش ثبت نمرات: "+completion+"٪"));LinearProgressIndicator(progress={completion/100f},modifier=Modifier.fillMaxWidth());Text(bidiNumbers("دانش‌آموزان: "+report.size+" | دارای نمره: "+scoredCount+" | عملکرد قوی (۱۷+): "+high+" | نیازمند توجه (<۱۲): "+low+" | بدون نمره: "+missing));Text("میانگین فقط از نمرات موجود محاسبه می‌شود؛ تکمیل ارزیابی برای نتیجه دقیق‌تر ضروری است.",style=MaterialTheme.typography.bodySmall)}}
-                    Text("تحلیل نقاط قوت و نیازمند تقویت",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);if(strongestColumn!=null)Text(bidiNumbers("قوی‌ترین حوزه: "+strongestColumn.first.name+" ("+"%.2f".format(strongestColumn.second)+")"));if(weakestColumn!=null)Text(bidiNumbers("نیازمند تقویت: "+weakestColumn.first.name+" ("+"%.2f".format(weakestColumn.second)+")"));Text("میانگین هر ستون",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);columnAnalysis.forEach{(col,avg)->Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(col.name);Text(avg?.let{"%.2f از ۲۰".format(it)}?: "بدون نمره",fontWeight=FontWeight.Bold)};LinearProgressIndicator(progress={((avg?:0f)/20f).coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth())}}};if(bestStudents.isNotEmpty()){Text("۳ دانش‌آموز برتر",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);bestStudents.forEach{(st,avg)->Text(bidiNumbers("${st.name} — %.2f".format(avg)))}};Text("توزیع میانگین",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
-                    listOf("۱۸ تا ۲۰" to report.count{(average(it.scores)?:-1f)>=18},"۱۶ تا ۱۸" to report.count{val a=average(it.scores);a!=null&&a>=16&&a<18},"۱۴ تا ۱۶" to report.count{val a=average(it.scores);a!=null&&a>=14&&a<16},"۱۲ تا ۱۴" to report.count{val a=average(it.scores);a!=null&&a>=12&&a<14},"کمتر از ۱۲" to low,"بدون نمره" to missing).forEach{(label,count)->Row(verticalAlignment=Alignment.CenterVertically){Text(label,Modifier.weight(1f));LinearProgressIndicator(progress={if(report.isEmpty())0f else count.toFloat()/report.size},Modifier.weight(1f));Text(bidiNumbers(count.toString()),Modifier.width(32.dp))}}
+                    Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text(bidiNumbers(selectedClass+" · "+selectedSubject),fontWeight=FontWeight.Bold);Text(bidiNumbers("میانگین کلاس: "+(classAvg?.let{"%.2f از ۲۰".format(it)}?: "—")),style=MaterialTheme.typography.titleLarge);Text(bidiNumbers("میانه: "+(median?.let{"%.2f".format(it)}?: "—")+" | پوشش ثبت نمرات: "+completion+"٪"));LinearProgressIndicator(progress={completion/100f},modifier=Modifier.fillMaxWidth());Text(bidiNumbers("دانش‌آموزان: "+report.size+" | دارای نمره: "+scoredCount+" | عملکرد قوی (۱۷+): "+high+" | نیازمند توجه (<۱۲): "+low+" | بدون نمره: "+missing));Text("میانگین فقط از نمرات موجود محاسبه می‌شود؛ تکمیل ارزیابی برای نتیجه دقیق‌تر ضروری است.",style=MaterialTheme.typography.bodySmall)}}
+                    Text("تحلیل نقاط قوت و نیازمند تقویت",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);if(strongestColumn!=null)Text(bidiNumbers("قوی‌ترین حوزه: "+strongestColumn.first.name+" ("+"%.2f".format(strongestColumn.second)+")"));if(weakestColumn!=null)Text(bidiNumbers("نیازمند تقویت: "+weakestColumn.first.name+" ("+"%.2f".format(weakestColumn.second)+")"));Text("میانگین هر ستون",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);columnAnalysis.forEach{(col,avg)->Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(col.name);Text(avg?.let{bidiNumbers("%.2f از ۲۰".format(it))}?: "بدون نمره",fontWeight=FontWeight.Bold)};LinearProgressIndicator(progress={((avg?:0f)/20f).coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth())}}};if(bestStudents.isNotEmpty()){Text(bidiNumbers("۳ دانش‌آموز برتر"),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);bestStudents.forEach{(st,avg)->Text(bidiNumbers("${st.name} — %.2f".format(avg)))}};Text("توزیع میانگین",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
+                    listOf("۱۸ تا ۲۰" to report.count{(average(it.scores)?:-1f)>=18},"۱۶ تا ۱۸" to report.count{val a=average(it.scores);a!=null&&a>=16&&a<18},"۱۴ تا ۱۶" to report.count{val a=average(it.scores);a!=null&&a>=14&&a<16},"۱۲ تا ۱۴" to report.count{val a=average(it.scores);a!=null&&a>=12&&a<14},"کمتر از ۱۲" to low,"بدون نمره" to missing).forEach{(label,count)->Row(verticalAlignment=Alignment.CenterVertically){Text(bidiNumbers(label),Modifier.weight(1f));LinearProgressIndicator(progress={if(report.isEmpty())0f else count.toFloat()/report.size},Modifier.weight(1f));Text(bidiNumbers(count.toString()),Modifier.width(32.dp))}}
                     Button(onClick={shareAnalysis(ctx,selectedClass,selectedSubject,report,columns)},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.FileDownload,"");Text("خروجی تحلیل در Word")}
                     report.forEach{StudentAnalysisCard(it,columns,report)}
                 }
                 4 -> {
                     Text("دستیار آموزشی",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
                     
-                    OutlinedTextField(lessonRequest,{lessonRequest=it},label={Text("پایه، درس و عنوان دقیق مبحث")},placeholder={Text("مثلاً پایه هفتم، علوم، فصل ۳، اتم‌ها")},modifier=Modifier.fillMaxWidth(),minLines=2)
+                    OutlinedTextField(lessonRequest,{lessonRequest=it},label={Text("پایه، درس و عنوان دقیق مبحث")},placeholder={Text(bidiNumbers("مثلاً پایه هفتم، علوم، فصل ۳، اتم‌ها"))},modifier=Modifier.fillMaxWidth(),minLines=2)
                     if(quizConfigOpen) {
                     Text("تنظیمات آزمون",fontWeight=FontWeight.Bold)
                     Text("نوع سؤال (چند انتخاب)",style=MaterialTheme.typography.bodyMedium)
                     listOf("چهارگزینه‌ای","تشریحی","صحیح و غلط","جای خالی").forEach { type -> FilterChip(selected=type in quizTypes,onClick={quizTypes=if(type in quizTypes)quizTypes-type else quizTypes+type},label={Text(type)}) }
-                    quizTypes.forEach { type -> OutlinedTextField(value=quizCounts[type]?: "1",onValueChange={v->quizCounts=quizCounts+(type to normalizeDigits(v).filter{it.isDigit()}.take(2))},label={Text("تعداد سؤال $type")},singleLine=true,modifier=Modifier.fillMaxWidth()) }
+                    quizTypes.forEach { type -> OutlinedTextField(value=quizCounts[type]?: "1",onValueChange={v->quizCounts=quizCounts+(type to normalizeDigits(v).filter{it.isDigit()}.take(2))},label={Text("تعداد سؤال $type")},singleLine=true,textStyle=MaterialTheme.typography.bodyLarge.copy(textDirection=androidx.compose.ui.text.style.TextDirection.Ltr),modifier=Modifier.fillMaxWidth()) }
                     Text("درجه سختی",fontWeight=FontWeight.Bold)
                     Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("آسان","متوسط","دشوار","ترکیبی").forEach{d->FilterChip(selected=quizDifficulty==d,onClick={quizDifficulty=d},label={Text(d)})}}
                     Row(verticalAlignment=Alignment.CenterVertically){Checkbox(checked=quizAnswerKey,onCheckedChange={quizAnswerKey=it});Text("پاسخنامه و بارم‌بندی")}
@@ -389,9 +390,9 @@ class MainActivity: ComponentActivity() {
                 var jalaliDay by remember{mutableStateOf(jalaliDateLabel(attendanceDate).takeLast(2))}
                 Text("تاریخ حضور و غیاب (شمسی)",fontWeight=FontWeight.Bold)
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(jalaliYear,{jalaliYear=it;jalaliToIso(it,jalaliMonth,jalaliDay)?.let{attendanceDate=it}},label={Text("سال")},modifier=Modifier.weight(1f),singleLine=true)
-                    OutlinedTextField(jalaliMonth,{jalaliMonth=it;jalaliToIso(jalaliYear,it,jalaliDay)?.let{attendanceDate=it}},label={Text("ماه")},modifier=Modifier.weight(1f),singleLine=true)
-                    OutlinedTextField(jalaliDay,{jalaliDay=it;jalaliToIso(jalaliYear,jalaliMonth,it)?.let{attendanceDate=it}},label={Text("روز")},modifier=Modifier.weight(1f),singleLine=true)
+                    OutlinedTextField(jalaliYear,{jalaliYear=it;jalaliToIso(it,jalaliMonth,jalaliDay)?.let{attendanceDate=it}},label={Text("سال")},modifier=Modifier.weight(1f),singleLine=true,textStyle=MaterialTheme.typography.bodyLarge.copy(textDirection=androidx.compose.ui.text.style.TextDirection.Ltr))
+                    OutlinedTextField(jalaliMonth,{jalaliMonth=it;jalaliToIso(jalaliYear,it,jalaliDay)?.let{attendanceDate=it}},label={Text("ماه")},modifier=Modifier.weight(1f),singleLine=true,textStyle=MaterialTheme.typography.bodyLarge.copy(textDirection=androidx.compose.ui.text.style.TextDirection.Ltr))
+                    OutlinedTextField(jalaliDay,{jalaliDay=it;jalaliToIso(jalaliYear,jalaliMonth,it)?.let{attendanceDate=it}},label={Text("روز")},modifier=Modifier.weight(1f),singleLine=true,textStyle=MaterialTheme.typography.bodyLarge.copy(textDirection=androidx.compose.ui.text.style.TextDirection.Ltr))
                 }
                 Text("تاریخ انتخاب‌شده: "+jalaliDateLabel(attendanceDate),style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary)
                 val roster=students.filter{it.clazz==selectedClass&&it.subject==selectedSubject}.distinctBy{it.studentNumber}.sortedBy{it.name}
@@ -559,7 +560,7 @@ class MainActivity: ComponentActivity() {
                 title={Text("ویرایش دانش‌آموز")},
                 text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
                     OutlinedTextField(editName,{editName=it},label={Text("نام دانش‌آموز")},singleLine=true)
-                    OutlinedTextField(editStudentNumber,{editStudentNumber=it},label={Text("شماره دانش‌آموزی")},singleLine=true)
+                    OutlinedTextField(editStudentNumber,{editStudentNumber=it},label={Text("شماره دانش‌آموزی")},singleLine=true,textStyle=MaterialTheme.typography.bodyLarge.copy(textDirection=androidx.compose.ui.text.style.TextDirection.Ltr))
                     OutlinedTextField(editClazz,{editClazz=it},label={Text("کلاس / پایه")},singleLine=true)
                     OutlinedTextField(editSubject,{editSubject=it},label={Text("درس")},singleLine=true)
                 }},
@@ -661,7 +662,7 @@ class MainActivity: ComponentActivity() {
                         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(3.dp),verticalAlignment=Alignment.CenterVertically) {
                             cells.forEach { cell ->
                                 Surface(Modifier.weight(1f),color=MaterialTheme.colorScheme.surfaceVariant,shape=MaterialTheme.shapes.small) {
-                                    Text(cell,Modifier.padding(vertical=9.dp,horizontal=3.dp),style=MaterialTheme.typography.bodySmall,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+                                    Text(bidiNumbers(cell),Modifier.padding(vertical=9.dp,horizontal=3.dp),style=MaterialTheme.typography.bodySmall,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
                                 }
                             }
                         }
@@ -795,7 +796,7 @@ class MainActivity: ComponentActivity() {
         if(delta!=null) Text(bidiNumbers(if(delta>=0) "بالاتر از میانگین هم‌کلاسی‌ها به میزان %.2f".format(delta) else "پایین‌تر از میانگین هم‌کلاسی‌ها به میزان %.2f".format(-delta)))
         if(strongest!=null) Text(bidiNumbers("نقطه قوت: ${strongest.key} (${"%.2f".format(strongest.value)})"))
         if(weakest!=null&&weakest.key!=strongest?.key) Text(bidiNumbers("نیازمند تقویت: ${weakest.key} (${"%.2f".format(weakest.value)})"))
-        if(missing.isNotEmpty()) Text("ارزیابی‌های ثبت‌نشده: ${missing.joinToString("، ")}")
+        if(missing.isNotEmpty()) Text(bidiNumbers("ارزیابی‌های ثبت‌نشده: ${missing.joinToString("، ")}"))
         Text("پیشنهاد آموزشی: $recommendation",color=MaterialTheme.colorScheme.primary)
     } }
 }
