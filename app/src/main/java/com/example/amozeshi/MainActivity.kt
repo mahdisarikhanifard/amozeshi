@@ -402,6 +402,7 @@ class MainActivity: ComponentActivity() {
                 }
             }
             }
+            if(snackbar.isNotBlank()) Text(snackbar,color=MaterialTheme.colorScheme.primary)
             if(editStudent!=null) AlertDialog(
                 onDismissRequest={editStudent=null},
                 title={Text("ویرایش دانش‌آموز")},
