@@ -348,6 +348,7 @@ class MainActivity: ComponentActivity() {
                     Text("اشتراک برنامه")
                 }
             }
+            }
             if(snackbar.isNotBlank()) Text(snackbar,color=MaterialTheme.colorScheme.primary)
         }
     }
