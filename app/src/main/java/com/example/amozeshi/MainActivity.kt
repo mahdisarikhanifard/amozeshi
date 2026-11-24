@@ -220,9 +220,9 @@ class MainActivity: ComponentActivity() {
                             value=v,
                             onValueChange={input->
                                 val normalized=normalizeScoreInput(input)
-                                v=normalized
+                                v=if(input.isBlank()) "" else normalized.ifBlank{input}
                                 val n=normalized.toFloatOrNull()
-                                if(normalized.isBlank()) {
+                                if(input.isBlank()) {
                                     if(currentScore!=null) {
                                         val updated=students.map{row->if(row.studentNumber==st.studentNumber&&row.clazz==st.clazz&&row.subject==st.subject)row.copy(scores=row.scores-c.name)else row}
                                         if(persist(updated)) students=updated else v=currentScore.toString()
@@ -836,7 +836,7 @@ fun jalaliDateLabel(iso:String):String {
     } catch(_:Exception) { iso }
 }
 fun normalizeDigits(s:String):String { val p="۰۱۲۳۴۵۶۷۸۹";val a="٠١٢٣٤٥٦٧٨٩";return s.map{ch->when{ch in p->(ch.code-p[0].code).toString();ch in a->(ch.code-a[0].code).toString();else->ch.toString()}}.joinToString("") }
-fun normalizeScoreInput(value:String):String = normalizeDigits(value).replace("٫",".").replace("٬","").replace("،",".").replace(",",".").filter{it.isDigit()||it=='.'||it=='-'}
+fun normalizeScoreInput(value:String):String = normalizeDigits(value).replace("٫",".").replace("٬","").replace("،",".").replace(",",".").trim()
 fun bidiLtr(value:String):String = "\u2066"+value+"\u2069"
 fun bidiNumbers(value:String):String {
     val pattern=Regex("[0-9۰-۹٠-٩]+(?:[.,٫٬][0-9۰-۹٠-٩]+)*")
