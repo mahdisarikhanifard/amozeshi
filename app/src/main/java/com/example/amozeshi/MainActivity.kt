@@ -196,9 +196,9 @@ class MainActivity: ComponentActivity() {
                     report.forEach{StudentAnalysisCard(it,columns)}
                 }
                 4 -> {
-                    Text("دستیار آموزشی هوشمند",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-                    Text("طرح درس و آزمون متناسب با کتاب و پایه",style=MaterialTheme.typography.bodyMedium)
-                    OutlinedTextField(lessonRequest,{lessonRequest=it},label={Text("کتاب، پایه، فصل یا موضوع")},modifier=Modifier.fillMaxWidth(),minLines=2)
+                    Text("دستیار آموزشی",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+                    Text("طرح درس کوتاه و دقیق بر اساس کتاب درسی",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedTextField(lessonRequest,{lessonRequest=it},label={Text("پایه، درس و عنوان دقیق مبحث")},placeholder={Text("مثلاً پایه هفتم، علوم، فصل ۳، اتم‌ها")},modifier=Modifier.fillMaxWidth(),minLines=2)
                     if(quizConfigOpen) {
                     Text("تنظیمات آزمون",fontWeight=FontWeight.Bold)
                     Text("نوع سؤال (چند انتخاب)",style=MaterialTheme.typography.bodyMedium)
@@ -244,7 +244,6 @@ class MainActivity: ComponentActivity() {
                             }
                         }
                     }
-                    Text("جستجو و تحلیل داخل برنامه انجام می‌شود؛ مرورگر گوشی باز نمی‌شود. در صورت پیدا نشدن متن رسمی کتاب، خروجی این موضوع را شفاف اعلام می‌کند.",style=MaterialTheme.typography.bodySmall)
                 }
                 5 -> {
                     Text("تنظیمات",style=MaterialTheme.typography.headlineSmall)
@@ -356,45 +355,63 @@ class MainActivity: ComponentActivity() {
 
 @Composable fun HomeScreen(students:List<Student>,columns:List<ScoreColumn>,onNavigate:(Int)->Unit,clazz:String,subject:String,onSelectClass:(String)->Unit){
     val classes=students.groupBy{it.clazz}.toSortedMap()
-    Column(verticalArrangement=Arrangement.spacedBy(18.dp)) {
-        Text("سلام، معلم عزیز 👋",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-        Text("کلاس‌های شما",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+    val scored=students.count{it.scores.isNotEmpty()}
+    Column(verticalArrangement=Arrangement.spacedBy(14.dp)) {
+        Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer),shape=MaterialTheme.shapes.extraLarge) {
+            Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text("یار معلم",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.onPrimaryContainer)
+                Text("مدیریت کلاس و پیگیری یادگیری، یک‌جا",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onPrimaryContainer)
+                Button(onClick={onNavigate(1)},modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.PersonAdd,""); Text("افزودن دانش‌آموز یا کلاس") }
+            }
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            DashboardStat("کلاس‌ها",classes.size.toString(),Icons.Default.Groups,Modifier.weight(1f))
+            DashboardStat("دانش‌آموزان",students.size.toString(),Icons.Default.People,Modifier.weight(1f))
+            DashboardStat("دارای نمره",scored.toString(),Icons.Default.AssignmentTurnedIn,Modifier.weight(1f))
+        }
+        Text("دسترسی سریع",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            DashboardTile("حضور و غیاب","ثبت و پیگیری حضور",Icons.Default.CheckCircle,Modifier.weight(1f)){onNavigate(6)}
+            DashboardTile("دفتر نمرات","ثبت و مشاهده نمرات",Icons.Default.Assignment,Modifier.weight(1f)){onNavigate(2)}
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            DashboardTile("طرح درس","ساخت طرح درس کوتاه",Icons.Default.AutoAwesome,Modifier.weight(1f)){onNavigate(4)}
+            DashboardTile("برنامه هفتگی","مشاهده برنامه کلاس",Icons.Default.CalendarMonth,Modifier.weight(1f)){onNavigate(7)}
+        }
+        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween,modifier=Modifier.fillMaxWidth()) {
+            Text("کلاس‌های من",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+            Text("${classes.size} کلاس",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         if(classes.isEmpty()) {
             Card { Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Text("هنوز کلاسی ثبت نشده است.")
-                Button(onClick={onNavigate(1)}){Text("افزودن دانش‌آموز و کلاس")}
+                Text("برای شروع، کلاس و دانش‌آموزان را اضافه کنید.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick={onNavigate(1)}){Text("ایجاد اولین کلاس")}
             } }
-        }
-        classes.forEach{(className,roster)->
+        } else classes.forEach{(className,roster)->
             val subjects=roster.map{it.subject}.distinct()
             Card(modifier=Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.large) {
-                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(className,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleLarge)
-                            Text("${roster.size} دانش‌آموز · ${subjects.size} درس",color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Surface(shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.primaryContainer) {
+                            Icon(Icons.Default.Groups,null,Modifier.padding(10.dp),tint=MaterialTheme.colorScheme.primary)
                         }
-                        Icon(Icons.Default.Groups,null,tint=MaterialTheme.colorScheme.primary)
+                        Column(Modifier.weight(1f).padding(horizontal=10.dp)) {
+                            Text(className,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium)
+                            Text("${roster.size} دانش‌آموز · ${subjects.size} درس",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text("${roster.count{it.scores.isNotEmpty()}} نمره‌دار",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
                     }
-                    subjects.forEach{lesson->Text("• $lesson",style=MaterialTheme.typography.bodyMedium)}
+                    Text(subjects.joinToString("  •  "),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2)
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick={onSelectClass(className);onNavigate(2)},modifier=Modifier.weight(1f)){Text("نمرات")}
                         OutlinedButton(onClick={onSelectClass(className);onNavigate(3)},modifier=Modifier.weight(1f)){Text("تحلیل")}
-                    }
-                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick={onSelectClass(className);onNavigate(6)},modifier=Modifier.weight(1f)){Text("حضور")}
-                        OutlinedButton(onClick={onSelectClass(className);onNavigate(7)},modifier=Modifier.weight(1f)){Text("برنامه")}
                     }
-                    OutlinedButton(onClick={onSelectClass(className);onNavigate(1)},modifier=Modifier.fillMaxWidth()){Text("مدیریت دانش‌آموزان")}
                 }
             }
         }
-        Button(onClick={onNavigate(1)},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.PersonAdd,"");Text("افزودن کلاس / دانش‌آموز")}
-        Text("دسترسی سریع",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-        Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-            DashboardTile("طرح درس","طراحی آموزشی",Icons.Default.AutoAwesome,Modifier.weight(1f)){onNavigate(4)}
-            DashboardTile("تنظیمات","مدیریت تنظیمات",Icons.Default.Settings,Modifier.weight(1f)){onNavigate(5)}
-        }
+        OutlinedButton(onClick={onNavigate(5)},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Settings,"");Text("تنظیمات برنامه")}
     }
 }
 @Composable private fun DashboardStat(label:String,value:String,icon:androidx.compose.ui.graphics.vector.ImageVector,modifier:Modifier=Modifier){
@@ -513,51 +530,29 @@ suspend fun generateLessonWithGroq(apiKey:String,request:String,mode:String="les
         val conn=(java.net.URL("https://api.groq.com/openai/v1/chat/completions").openConnection() as java.net.HttpURLConnection)
         conn.requestMethod="POST";conn.connectTimeout=30000;conn.readTimeout=120000;conn.doOutput=true
         conn.setRequestProperty("Content-Type","application/json");conn.setRequestProperty("Authorization","Bearer ${apiKey.trim()}")
-        val task=if(mode=="quiz")"""بر اساس تنظیمات آزمون که در درخواست آمده، آزمون بساز. دقیقاً نوع سؤال‌های انتخاب‌شده و تعداد تعیین‌شده برای هر نوع را رعایت کن؛ هیچ سؤال اضافی یا نوع انتخاب‌نشده تولید نکن. درجه دشواری انتخاب‌شده را در همه سؤال‌ها رعایت کن. اگر پاسخنامه درخواست شده، آن را در بخش جداگانه با پاسخ صحیح، پاسخ تشریحی کوتاه و بارم هر سؤال ارائه کن؛ در غیر این صورت پاسخ‌ها را نمایش نده. خروجی مختصر، مرتب و بدون مقدمه طولانی باشد. مطالب تأییدنشده را به کتاب نسبت نده.""" else """طرح درس حرفه‌ای تولید کن: اهداف رفتاری، پیش‌نیاز، وسایل، ایجاد انگیزه، مراحل تدریس با زمان، فعالیت معلم و دانش‌آموز، مثال‌های کتاب، ارزشیابی آغازین/تکوینی/پایانی، تکلیف و تمایز آموزشی برای دانش‌آموزان ضعیف و قوی. برای ریاضی حل مثال‌ها مرحله‌به‌مرحله و مناسب پایه باشد."""
-        val prompt="""درخواست: $request
-ابتدا با browser_search کتاب رسمی آموزش‌وپرورش ایران، PDF کتاب و منابع معتبر مانند chap.sch.ir و رشد را جستجو کن. پایه، عنوان فصل و درس و محتوای دقیق را تطبیق بده. فقط محتوای بررسی‌شده را به کتاب نسبت بده. اگر متن یا منبع دقیق پیدا نشد، صریح بنویس «متن دقیق کتاب تأیید نشد» و محتوای عمومی را از مطالب کتاب جدا کن؛ هیچ صفحه، تمرین یا مثال ساختگی نکن. اگر مشخصات مبهم است، ابهام را اعلام کن.
+        val task=if(mode=="quiz")"""بر اساس تنظیمات آزمون که در درخواست آمده، آزمون بساز. دقیقاً نوع سؤال‌های انتخاب‌شده و تعداد تعیین‌شده برای هر نوع را رعایت کن؛ هیچ سؤال اضافی یا نوع انتخاب‌نشده تولید نکن. درجه دشواری انتخاب‌شده را در همه سؤال‌ها رعایت کن. اگر پاسخنامه درخواست شده، آن را در بخش جداگانه با پاسخ صحیح، پاسخ تشریحی کوتاه و بارم هر سؤال ارائه کن؛ در غیر این صورت پاسخ‌ها را نمایش نده. خروجی مختصر، مرتب و بدون مقدمه طولانی باشد. مطالب تأییدنشده را به کتاب نسبت نده.""" else """فقط یک طرح درس کوتاه و اجرایی بنویس؛ حداکثر ۱۸۰ تا ۲۲۰ کلمه. فقط این بخش‌ها را با تیترهای کوتاه بیاور: هدف درس (یک جمله)، شروع و ارزشیابی آغازین (۲ دقیقه)، تدریس و فعالیت دانش‌آموز (با زمان‌بندی متناسب با یک زنگ)، ارزشیابی پایانی (یک روش مشخص)، تکلیف (یک مورد). از مقدمه، توضیح درباره روش جستجو، توصیه‌های عمومی، تکرار هدف‌ها، فهرست منابع طولانی و بخش‌های اضافی خودداری کن. مثال یا فعالیت باید دقیقاً با همان مبحث و پایه متناسب باشد؛ مثال یا صفحه ساختگی نساز."""
+        val prompt="""درخواست خام کاربر: $request
+ابتدا پایه تحصیلی، نام درس، فصل/درس و عنوان مبحث را استخراج کن. جستجو را با ترکیب دقیق همین مشخصات و عنوان مبحث انجام بده؛ ابتدا منبع رسمی کتاب‌های درسی آموزش‌وپرورش (chap.sch.ir) و سپس شبکه رشد را بررسی کن. نتیجه باید هم‌زمان با پایه و عنوان مبحث تطبیق داشته باشد؛ نتیجه مشابه از پایه یا درس دیگر را استفاده نکن. از جستجوی کلی موضوع بدون پایه و عنوان دقیق پرهیز کن.
+اگر پایه یا نام درس یا مبحث مشخص نیست و از متن قابل تشخیص نیست، فقط یک سؤال کوتاه برای تکمیل همان مورد بپرس و طرح درس نساز. اگر منبع معتبر و منطبق پیدا نشد، فقط یک جمله کوتاه اعلام کن که متن دقیق کتاب تأیید نشد و سپس طرح درس عمومیِ محدود به اطلاعات قطعی درخواست ارائه بده؛ هیچ صفحه، تمرین، مثال یا عنوانی را جعل نکن.
 $task
-خروجی فارسی، منظم و کاربردی باشد؛ منابع و لینک‌های بررسی‌شده و میزان اطمینان را ذکر کن."""
+فقط خروجی خواسته‌شده را به فارسی بده. از مقدمه، جمع‌بندی، توضیح درباره هوش مصنوعی یا جستجو، منابع مفصل و توصیه‌های اضافه خودداری کن. اگر منبع دقیق پیدا شد، حداکثر یک ارجاع کوتاه در انتهای خروجی بیاور."""
         val body=JSONObject().put("model","openai/gpt-oss-120b")
             .put("messages",JSONArray().put(JSONObject().put("role","system").put("content","دستیار پژوهش آموزشی و طراحی درس؛ جستجوی وب را انجام بده و از جعل منابع پرهیز کن.")).put(JSONObject().put("role","user").put("content",prompt)))
-            .put("temperature",0.3).put("max_completion_tokens",6000)
+            .put("temperature",0.2).put("max_completion_tokens",2200)
         conn.outputStream.use{it.write(body.toString().toByteArray(Charsets.UTF_8))}
         val code=conn.responseCode;val raw=(if(code in 200..299)conn.inputStream else conn.errorStream)?.bufferedReader()?.use{it.readText()} ?: ""
         if(code !in 200..299){val err=try{JSONObject(raw).optJSONObject("error")?.optString("message").orEmpty()}catch(_:Exception){""};when(code){401->"کلید Groq معتبر نیست.";403->"دسترسی به جستجوی وب یا مدل مجاز نیست.";429->"محدودیت درخواست Groq؛ کمی بعد تلاش کنید.";else->"خطای Groq ($code): ${err.ifBlank{"درخواست ناموفق"}}"}}
         else JSONObject(raw).optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content").orEmpty().ifBlank{"پاسخ جستجو خالی بود؛ درخواست را دقیق‌تر کنید."}
     }catch(e:Exception){"جستجو ناموفق بود: ${e.message ?: "خطای نامشخص"}"}
 }
-fun lessonTemplate(req:String)= """طرح درس پیشنهادی
-درخواست: $req
+fun lessonTemplate(req:String)= """طرح درس کوتاه
+موضوع: $req
 
-۱. اهداف آموزشی
-• آشنایی با مفاهیم اصلی درس
-• توانایی توضیح و تحلیل مطالب
-• مشارکت فعال در بحث
-
-۲. شروع کلاس (۵ دقیقه)
-• پرسش از آموخته‌های قبلی
-• ایجاد انگیزه با سؤال مرتبط
-
-۳. تدریس (۲۰ تا ۳۰ دقیقه)
-• ارائه مفاهیم کلیدی
-• مثال و ارتباط با زندگی روزمره
-• گفت‌وگوی هدایت‌شده
-
-۴. فعالیت دانش‌آموزان
-• کار گروهی و پاسخ به پرسش‌ها
-• خلاصه‌سازی نکات مهم
-
-۵. ارزشیابی
-• پرسش شفاهی
-• چند سؤال کوتاه
-• بررسی مشارکت
-
-۶. تکلیف
-• خلاصه درس
-• پاسخ به پرسش‌های منتخب کتاب
-
-توجه: برای طرح درس دقیق، متن کتاب یا منابع معتبر را بررسی و نکات را تکمیل کنید.
+• هدف: درک مفهوم اصلی و بیان یک نمونه مرتبط
+• شروع کلاس (۳ دقیقه): یک پرسش کوتاه از دانسته‌های قبلی
+• تدریس و فعالیت (۲۵ دقیقه): توضیح نکته اصلی، ارائه یک مثال مرتبط و بررسی آن با مشارکت دانش‌آموزان
+• ارزشیابی (۵ دقیقه): یک پرسش کاربردی برای سنجش یادگیری
+• تکلیف: پاسخ به یک تمرین مرتبط از کتاب درسی
 """.trimIndent()
 fun loadStudents(raw:String):List<Student> = try { val a=JSONArray(raw);(0 until a.length()).map{val o=a.getJSONObject(it);val sc=o.getJSONObject("scores");val m=mutableMapOf<String,Float>();sc.keys().forEach{m[it]=sc.getDouble(it).toFloat()};Student(o.getString("name"),o.getString("clazz"),o.getString("subject"),m)} }catch(_:Exception){emptyList()}
 fun saveStudents(list:List<Student>):String {val a=JSONArray();list.forEach{s->val scores=JSONObject();s.scores.forEach{(k,v)->scores.put(k,v)};a.put(JSONObject().put("name",s.name).put("clazz",s.clazz).put("subject",s.subject).put("scores",scores))};return a.toString()}
