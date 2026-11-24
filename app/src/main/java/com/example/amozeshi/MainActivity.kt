@@ -789,10 +789,11 @@ fun makeBackup(students:List<Student>,columns:List<ScoreColumn>,attendance:JSONO
 fun autoBackup(prefs:android.content.SharedPreferences,students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String,apiKey:String=""){try{val json=makeBackup(students,columns,attendance,timetable);val e=prefs.edit().putString("auto_backup_latest",json).putString("auto_backup_time",java.time.Instant.now().toString());for(i in 6 downTo 1){val old=prefs.getString("auto_backup_"+i,null);if(old!=null)e.putString("auto_backup_"+(i+1),old)};e.putString("auto_backup_1",json);if(!e.commit())throw IllegalStateException("auto backup commit failed")}catch(_:Exception){}}
 fun average(scores:Map<String,Float>):Float?=scores.values.takeIf{it.isNotEmpty()}?.average()?.toFloat()
 fun parseVoice(text:String):Pair<String,Float>?{
-    val nums=Regex("""\d+(?:[٫.]\d+)?""").findAll(text).mapNotNull{it.value.replace('٫','.').toFloatOrNull()}.toList()
+    val normalized=normalizeDigits(text).replace("٫",".").replace("،",".").replace(",",".")
+    val nums=Regex("""\d+(?:\.\d+)?""").findAll(normalized).mapNotNull{it.value.toFloatOrNull()}.toList()
     if(nums.isEmpty())return null
     val score=nums.last()
-    val name=text.replace(Regex("""\d+(?:[٫.]\d+)?"""),"").replace(Regex("""(نمره|امتحان|آزمون|درس|از|برای)"""),"").trim()
+    val name=normalized.replace(Regex("""\d+(?:\.\d+)?"""),"").replace(Regex("""(نمره|امتحان|آزمون|درس|از|برای)"""),"").trim()
     return name.takeIf{it.isNotBlank()}?.let{it to score}
 }
 suspend fun generateLessonWithGroq(apiKey:String,request:String,mode:String="lesson"):String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
