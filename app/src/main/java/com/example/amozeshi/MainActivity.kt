@@ -35,7 +35,7 @@ import androidx.security.crypto.MasterKey
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 
-data class Student(val name:String, val clazz:String, val subject:String, val scores:Map<String,Float>)
+data class Student(val name:String, val clazz:String, val subject:String, val scores:Map<String,Float>, val studentNumber:String = "")
 data class ScoreColumn(val name:String, val max:Float=20f, val weight:Float=1f)
 
 class MainActivity: ComponentActivity() {
@@ -58,6 +58,7 @@ class MainActivity: ComponentActivity() {
     var selectedClass by remember { mutableStateOf(students.firstOrNull()?.clazz ?: "") }
     var selectedSubject by remember { mutableStateOf(students.firstOrNull { it.clazz == selectedClass }?.subject ?: "") }
     var nameInput by remember { mutableStateOf("") }
+    var studentNumberInput by remember { mutableStateOf("") }
     var classInput by remember { mutableStateOf(students.firstOrNull()?.clazz ?: "") }
     var subjectInput by remember { mutableStateOf(students.firstOrNull()?.subject ?: "") }
     var newColumn by remember { mutableStateOf("") }
@@ -78,6 +79,7 @@ class MainActivity: ComponentActivity() {
     var apiTestResult by remember { mutableStateOf("") }
     var editStudent by remember { mutableStateOf<Student?>(null) }
     var editName by remember { mutableStateOf("") }
+    var editStudentNumber by remember { mutableStateOf("") }
     var editClazz by remember { mutableStateOf("") }
     var editSubject by remember { mutableStateOf("") }
     val scope=rememberCoroutineScope()
@@ -138,18 +140,22 @@ class MainActivity: ComponentActivity() {
                 1 -> {
                     Text("مدیریت کلاس‌ها", style=MaterialTheme.typography.headlineSmall, fontWeight=FontWeight.Bold)
                     OutlinedTextField(nameInput, { nameInput=it }, label={Text("نام دانش‌آموز")}, modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(studentNumberInput, { studentNumberInput=it }, label={Text("شماره دانش‌آموزی")}, modifier=Modifier.fillMaxWidth(), singleLine=true)
                     OutlinedTextField(classInput, { classInput=it }, label={Text("کلاس / پایه")}, modifier=Modifier.fillMaxWidth())
                     OutlinedTextField(subjectInput, { subjectInput=it }, label={Text("درس")}, modifier=Modifier.fillMaxWidth())
                     Button(onClick={
-                        if(nameInput.isNotBlank() && classInput.isNotBlank() && subjectInput.isNotBlank()) {
-                            val exists=students.any{it.name.equals(nameInput.trim(),true)&&it.clazz==classInput.trim()&&it.subject==subjectInput.trim()}
-                            if(!exists) {
-                                students=students+Student(nameInput.trim(),classInput.trim(),subjectInput.trim(),emptyMap())
+                        if(nameInput.isNotBlank() && studentNumberInput.isNotBlank() && classInput.isNotBlank() && subjectInput.isNotBlank()) {
+                            val number=studentNumberInput.trim()
+                            val conflicting=students.any{it.studentNumber==number && (!it.name.equals(nameInput.trim(),true) || it.clazz!=classInput.trim())}
+                            val exists=students.any{it.studentNumber==number && it.clazz==classInput.trim() && it.subject==subjectInput.trim()}
+                            if(conflicting) snackbar="این شماره دانش‌آموزی قبلاً برای فرد دیگری ثبت شده است."
+                            else if(!exists) {
+                                students=students+Student(nameInput.trim(),classInput.trim(),subjectInput.trim(),emptyMap(),number)
                                 persist()
                                 snackbar="دانش‌آموز ثبت شد."
-                            } else snackbar="این دانش‌آموز قبلاً ثبت شده است."
-                            nameInput=""
-                        }
+                                nameInput="";studentNumberInput=""
+                            } else snackbar="این دانش‌آموز قبلاً در این درس ثبت شده است."
+                        } else snackbar="نام، شماره دانش‌آموزی، کلاس و درس را کامل کنید."
                     }, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.PersonAdd,""); Text("ثبت دانش‌آموز") }
                     Text("کلاس‌ها و درس‌ها", style=MaterialTheme.typography.titleLarge, fontWeight=FontWeight.Bold)
                     students.groupBy{it.clazz to it.subject}.forEach{(group,list)->
@@ -168,7 +174,8 @@ class MainActivity: ComponentActivity() {
                                             Text(st.name,fontWeight=FontWeight.SemiBold)
                                             Text("میانگین: "+(average(st.scores)?.let{"%.2f".format(it)}?: "—"))
                                         }
-                                        IconButton(onClick={editStudent=st;editName=st.name;editClazz=st.clazz;editSubject=st.subject}){Icon(Icons.Default.Edit,"ویرایش")}
+                                        Text("شماره: ${st.studentNumber}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                        IconButton(onClick={editStudent=st;editName=st.name;editStudentNumber=st.studentNumber;editClazz=st.clazz;editSubject=st.subject}){Icon(Icons.Default.Edit,"ویرایش")}
                                         IconButton(onClick={students=students.filterNot{it==st};persist()}){Icon(Icons.Default.Delete,"حذف")}
                                     }
                                 }
@@ -332,7 +339,7 @@ class MainActivity: ComponentActivity() {
                 var attendanceClassMenu by remember{mutableStateOf(false)}
                 ExposedDropdownMenuBox(expanded=attendanceClassMenu,onExpandedChange={attendanceClassMenu=it}) {
                     OutlinedTextField(selectedClass,{selectedClass=it},readOnly=true,label={Text("انتخاب کلاس")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(attendanceClassMenu)},modifier=Modifier.fillMaxWidth().menuAnchor())
-                    ExposedDropdownMenu(expanded=attendanceClassMenu,onDismissRequest={attendanceClassMenu=false}) { attendanceClasses.forEach{cl->DropdownMenuItem(text={Text(cl)},onClick={selectedClass=cl;attendanceClassMenu=false;selectedSubject=students.filter{it.clazz==cl}.map{it.subject}.distinct().firstOrNull() ?: selectedSubject})} }
+                    ExposedDropdownMenu(expanded=attendanceClassMenu,onDismissRequest={attendanceClassMenu=false}) { attendanceClasses.forEach{cl->DropdownMenuItem(text={Text(cl)},onClick={selectedClass=cl;attendanceClassMenu=false;selectedSubject=students.filter{it.clazz==cl}.map{it.subject}.distinct().firstOrNull() ?: ""})} }
                 }
                 val attendanceSubjects=students.filter{it.clazz==selectedClass}.map{it.subject}.distinct().sorted()
                 var attendanceSubjectMenu by remember{mutableStateOf(false)}
@@ -350,34 +357,71 @@ class MainActivity: ComponentActivity() {
                     OutlinedTextField(jalaliDay,{jalaliDay=it;jalaliToIso(jalaliYear,jalaliMonth,it)?.let{attendanceDate=it}},label={Text("روز")},modifier=Modifier.weight(1f),singleLine=true)
                 }
                 Text("تاریخ انتخاب‌شده: "+jalaliDateLabel(attendanceDate),style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary)
-                val roster=students.filter{it.clazz==selectedClass&&it.subject==selectedSubject}.sortedBy{it.name}
-                Text("کلاس: $selectedClass · درس: $selectedSubject")
-                val day=attendance.optJSONObject(attendanceDate)?:JSONObject()
-                Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Row(Modifier.fillMaxWidth().padding(14.dp),horizontalArrangement=Arrangement.SpaceBetween){Text("حاضر: "+roster.count{day.optString(it.name)=="present"});Text("غایب: "+roster.count{day.optString(it.name)=="absent"});Text("ثبت‌نشده: "+roster.count{day.optString(it.name).isBlank()})}}
-                Text("سوابق ماه انتخاب‌شده",fontWeight=FontWeight.Bold)
-                val monthRecords=attendance.keys().asSequence().filter{it.startsWith(attendanceDate.take(7))}.sorted().toList()
-                if(monthRecords.isEmpty()) Text("در این ماه سابقه‌ای ثبت نشده است.") else monthRecords.forEach{dateKey->val rec=attendance.optJSONObject(dateKey)?:JSONObject();Card{Column(Modifier.padding(10.dp)){Text(jalaliDateLabel(dateKey),fontWeight=FontWeight.Bold);Text("حاضر: "+rec.keys().asSequence().count{rec.optString(it)=="present"}+" · غایب: "+rec.keys().asSequence().count{rec.optString(it)=="absent"})}}}
-                roster.forEach{st->Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically){Text(st.name,Modifier.weight(1f));FilterChip(selected=day.optString(st.name)=="present",onClick={day.put(st.name,"present");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply();autoBackup(prefs,students,columns,attendance,timetable,apiKey)},label={Text("حاضر")});Spacer(Modifier.width(6.dp));FilterChip(selected=day.optString(st.name)=="absent",onClick={day.put(st.name,"absent");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply();autoBackup(prefs,students,columns,attendance,timetable,apiKey)},label={Text("غایب")})}}
-                Button(
-                    onClick = {
-                        val report = roster.joinToString("\n") { st ->
-                            st.name + " : " + when (day.optString(st.name)) {
-                                "present" -> "حاضر"
-                                "absent" -> "غایب"
-                                else -> "ثبت نشده"
-                            }
-                        }
-                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_SUBJECT, "حضور و غیاب $attendanceDate")
-                            putExtra(Intent.EXTRA_TEXT, report)
-                        }
-                        ctx.startActivity(Intent.createChooser(sendIntent, "اشتراک گزارش حضور"))
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("خروجی حضور و غیاب")
+                val roster=students.filter{it.clazz==selectedClass&&it.subject==selectedSubject}.distinctBy{it.studentNumber}.sortedBy{it.name}
+                val lessonKey=selectedClass+"::"+selectedSubject
+                val dateRecord=attendance.optJSONObject(attendanceDate)?:JSONObject()
+                val day=dateRecord.optJSONObject(lessonKey)?:JSONObject()
+                Text("کلاس: $selectedClass · درس: $selectedSubject",fontWeight=FontWeight.SemiBold)
+                Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){
+                    Row(Modifier.fillMaxWidth().padding(14.dp),horizontalArrangement=Arrangement.SpaceBetween){
+                        Text("حاضر: "+roster.count{day.optString(it.studentNumber)=="present"})
+                        Text("غایب: "+roster.count{day.optString(it.studentNumber)=="absent"})
+                        Text("ثبت‌نشده: "+roster.count{day.optString(it.studentNumber).isBlank()})
+                    }
                 }
+                Text("ثبت وضعیت روزانه",fontWeight=FontWeight.Bold)
+                roster.forEach{st->
+                    val status=day.optString(st.studentNumber)
+                    Card { Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically){
+                        Column(Modifier.weight(1f)){Text(st.name,fontWeight=FontWeight.SemiBold);Text("شماره: ${st.studentNumber}",style=MaterialTheme.typography.bodySmall)}
+                        FilterChip(selected=status=="present",onClick={
+                            val next=JSONObject(attendance.toString());val date=JSONObject((next.optJSONObject(attendanceDate)?:JSONObject()).toString());val lesson=JSONObject((date.optJSONObject(lessonKey)?:JSONObject()).toString())
+                            lesson.put(st.studentNumber,"present");date.put(lessonKey,lesson);next.put(attendanceDate,date);attendance=next
+                            prefs.edit().putString("attendance",next.toString()).apply();autoBackup(prefs,students,columns,next,timetable,apiKey)
+                        },label={Text("حاضر")})
+                        Spacer(Modifier.width(5.dp))
+                        FilterChip(selected=status=="absent",onClick={
+                            val next=JSONObject(attendance.toString());val date=JSONObject((next.optJSONObject(attendanceDate)?:JSONObject()).toString());val lesson=JSONObject((date.optJSONObject(lessonKey)?:JSONObject()).toString())
+                            lesson.put(st.studentNumber,"absent");date.put(lessonKey,lesson);next.put(attendanceDate,date);attendance=next
+                            prefs.edit().putString("attendance",next.toString()).apply();autoBackup(prefs,students,columns,next,timetable,apiKey)
+                        },label={Text("غایب")})
+                    }}
+                }
+                Text("گزارش کلی این درس",fontWeight=FontWeight.Bold)
+                val lessonDates=attendance.keys().asSequence().filter{key->(attendance.optJSONObject(key)?.optJSONObject(lessonKey))!=null}.sorted().toList()
+                val totalPresent=lessonDates.sumOf{key->val rec=attendance.optJSONObject(key)?.optJSONObject(lessonKey)?:JSONObject();roster.count{rec.optString(it.studentNumber)=="present"}}
+                val totalAbsent=lessonDates.sumOf{key->val rec=attendance.optJSONObject(key)?.optJSONObject(lessonKey)?:JSONObject();roster.count{rec.optString(it.studentNumber)=="absent"}}
+                Card { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+                    Text("روزهای دارای ثبت: ${lessonDates.size}")
+                    Text("مجموع حضورها: $totalPresent · مجموع غیبت‌ها: $totalAbsent")
+                    Text("درصد حضور ثبت‌شده: "+if(totalPresent+totalAbsent==0)"—" else "${(totalPresent*100/(totalPresent+totalAbsent))}%")
+                }}
+                Text("گزارش هر دانش‌آموز",fontWeight=FontWeight.Bold)
+                roster.forEach{st->
+                    val present=lessonDates.sumOf{key->if(attendance.optJSONObject(key)?.optJSONObject(lessonKey)?.optString(st.studentNumber)=="present")1 else 0}
+                    val absent=lessonDates.sumOf{key->if(attendance.optJSONObject(key)?.optJSONObject(lessonKey)?.optString(st.studentNumber)=="absent")1 else 0}
+                    Card { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(3.dp)){
+                        Text(st.name+" · "+st.studentNumber,fontWeight=FontWeight.SemiBold)
+                        Text("حضور: $present · غیبت: $absent · ثبت‌نشده: ${(lessonDates.size-present-absent).coerceAtLeast(0)}")
+                    }}
+                }
+                Text("سوابق ماه انتخاب‌شده",fontWeight=FontWeight.Bold)
+                val monthRecords=lessonDates.filter{it.startsWith(attendanceDate.take(7))}
+                if(monthRecords.isEmpty()) Text("در این ماه برای این درس سابقه‌ای ثبت نشده است.") else monthRecords.forEach{dateKey->
+                    val rec=attendance.optJSONObject(dateKey)?.optJSONObject(lessonKey)?:JSONObject()
+                    Card { Column(Modifier.padding(10.dp)){
+                        Text(jalaliDateLabel(dateKey),fontWeight=FontWeight.Bold)
+                        Text("حاضر: ${roster.count{rec.optString(it.studentNumber)=="present"}} · غایب: ${roster.count{rec.optString(it.studentNumber)=="absent"}}")
+                    }}
+                }
+                Button(onClick={
+                    val report=buildString{
+                        append("گزارش حضور و غیاب\nکلاس: $selectedClass\nدرس: $selectedSubject\nتاریخ: ${jalaliDateLabel(attendanceDate)}\n\n")
+                        roster.forEach{st->append("${st.name} (${st.studentNumber}): ");append(when(day.optString(st.studentNumber)){"present"->"حاضر";"absent"->"غایب";else->"ثبت نشده"});append("\n")}
+                    }
+                    val sendIntent=Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_SUBJECT,"حضور و غیاب $selectedClass - $selectedSubject");putExtra(Intent.EXTRA_TEXT,report)}
+                    ctx.startActivity(Intent.createChooser(sendIntent,"اشتراک گزارش حضور"))
+                },modifier=Modifier.fillMaxWidth()){Text("خروجی گزارش روزانه")}
             }
             7 -> {
                 Text("برنامه هفتگی",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
@@ -408,14 +452,17 @@ class MainActivity: ComponentActivity() {
                 title={Text("ویرایش دانش‌آموز")},
                 text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
                     OutlinedTextField(editName,{editName=it},label={Text("نام دانش‌آموز")},singleLine=true)
+                    OutlinedTextField(editStudentNumber,{editStudentNumber=it},label={Text("شماره دانش‌آموزی")},singleLine=true)
                     OutlinedTextField(editClazz,{editClazz=it},label={Text("کلاس / پایه")},singleLine=true)
                     OutlinedTextField(editSubject,{editSubject=it},label={Text("درس")},singleLine=true)
                 }},
                 confirmButton={TextButton(onClick={
                     val old=editStudent
-                    if(old!=null&&editName.isNotBlank()&&editClazz.isNotBlank()&&editSubject.isNotBlank()){
-                        students=students.map{if(it==old)old.copy(name=editName.trim(),clazz=editClazz.trim(),subject=editSubject.trim())else it}
-                        persist()
+                    if(old!=null&&editName.isNotBlank()&&editStudentNumber.isNotBlank()&&editClazz.isNotBlank()&&editSubject.isNotBlank()){
+                        val number=editStudentNumber.trim()
+                        val conflict=students.any{it!=old && it.studentNumber==number && (!it.name.equals(editName.trim(),true) || it.clazz!=editClazz.trim())}
+                        if(conflict) snackbar="این شماره دانش‌آموزی برای فرد دیگری ثبت شده است."
+                        else { students=students.map{if(it==old)old.copy(name=editName.trim(),studentNumber=number,clazz=editClazz.trim(),subject=editSubject.trim())else it};persist() }
                     }
                     editStudent=null
                 }){Text("ذخیره")}},
@@ -657,8 +704,8 @@ fun lessonTemplate(req:String)= """طرح درس کوتاه
 • ارزشیابی (۵ دقیقه): یک پرسش کاربردی برای سنجش یادگیری
 • تکلیف: پاسخ به یک تمرین مرتبط از کتاب درسی
 """.trimIndent()
-fun loadStudents(raw:String):List<Student> = try { val a=JSONArray(raw);(0 until a.length()).map{val o=a.getJSONObject(it);val sc=o.getJSONObject("scores");val m=mutableMapOf<String,Float>();sc.keys().forEach{m[it]=sc.getDouble(it).toFloat()};Student(o.getString("name"),o.getString("clazz"),o.getString("subject"),m)} }catch(_:Exception){emptyList()}
-fun saveStudents(list:List<Student>):String {val a=JSONArray();list.forEach{s->val scores=JSONObject();s.scores.forEach{(k,v)->scores.put(k,v)};a.put(JSONObject().put("name",s.name).put("clazz",s.clazz).put("subject",s.subject).put("scores",scores))};return a.toString()}
+fun loadStudents(raw:String):List<Student> = try { val a=JSONArray(raw);(0 until a.length()).map{val o=a.getJSONObject(it);val name=o.getString("name");val clazz=o.getString("clazz");val sc=o.getJSONObject("scores");val m=mutableMapOf<String,Float>();sc.keys().forEach{m[it]=sc.getDouble(it).toFloat()};val legacyNumber="قدیمی-"+Integer.toUnsignedString((clazz+"|"+name).hashCode());Student(name,clazz,o.getString("subject"),m,o.optString("studentNumber").ifBlank{legacyNumber})} }catch(_:Exception){emptyList()}
+fun saveStudents(list:List<Student>):String {val a=JSONArray();list.forEach{s->val scores=JSONObject();s.scores.forEach{(k,v)->scores.put(k,v)};a.put(JSONObject().put("name",s.name).put("studentNumber",s.studentNumber).put("clazz",s.clazz).put("subject",s.subject).put("scores",scores))};return a.toString()}
 fun loadColumns(raw:String):List<ScoreColumn> = try {val a=JSONArray(raw);(0 until a.length()).map{ScoreColumn(a.getString(it))}}catch(_:Exception){listOf(ScoreColumn("مستمر"),ScoreColumn("شفاهی"),ScoreColumn("آزمون"))}
 fun saveColumns(list:List<ScoreColumn>)=JSONArray().also{a->list.forEach{a.put(it.name)}}.toString()
 
