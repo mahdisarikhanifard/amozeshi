@@ -186,9 +186,9 @@ class MainActivity: ComponentActivity() {
                                     Row(verticalAlignment=Alignment.CenterVertically) {
                                         Column(Modifier.weight(1f)) {
                                             Text(st.name,fontWeight=FontWeight.SemiBold)
-                                            Text("میانگین: "+(average(st.scores)?.let{"%.2f".format(it)}?: "—"))
+                                            Text("میانگین: "+(average(st.scores)?.let{bidiLtr("%.2f".format(it))}?: "—"))
                                         }
-                                        Text("شماره: ${st.studentNumber}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("شماره: ${bidiLtr(st.studentNumber)}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                                         IconButton(onClick={editStudent=st;editName=st.name;editStudentNumber=st.studentNumber;editClazz=st.clazz;editSubject=st.subject}){Icon(Icons.Default.Edit,"ویرایش")}
                                         IconButton(onClick={students=students.filterNot{it==st};persist()}){Icon(Icons.Default.Delete,"حذف")}
                                     }
@@ -206,14 +206,37 @@ class MainActivity: ComponentActivity() {
                     var subjectMenu by remember{mutableStateOf(false)}
                     ExposedDropdownMenuBox(expanded=subjectMenu,onExpandedChange={subjectMenu=it}){OutlinedTextField(selectedSubject,{selectedSubject=it},readOnly=true,label={Text("درس")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(subjectMenu)},modifier=Modifier.fillMaxWidth().menuAnchor());ExposedDropdownMenu(expanded=subjectMenu,onDismissRequest={subjectMenu=false}){subjectOptions.forEach{DropdownMenuItem(text={Text(it)},onClick={selectedSubject=it;subjectMenu=false})}}}
                     val roster=students.filter{it.clazz==selectedClass&&it.subject==selectedSubject}.sortedBy{it.name}
-                    Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Row(Modifier.fillMaxWidth().padding(14.dp),horizontalArrangement=Arrangement.SpaceBetween){Column{Text("تعداد");Text(roster.size.toString(),fontWeight=FontWeight.Bold)};Column{Text("دارای نمره");Text(roster.count{it.scores.isNotEmpty()}.toString(),fontWeight=FontWeight.Bold)};Column{Text("میانگین کلاس");Text(classAverage(roster)?.let{"%.2f".format(it)}?: "—",fontWeight=FontWeight.Bold)}}}
+                    Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Row(Modifier.fillMaxWidth().padding(14.dp),horizontalArrangement=Arrangement.SpaceBetween){Column{Text("تعداد");Text(bidiLtr(roster.size.toString()),fontWeight=FontWeight.Bold)};Column{Text("دارای نمره");Text(bidiLtr(roster.count{it.scores.isNotEmpty()}.toString()),fontWeight=FontWeight.Bold)};Column{Text("میانگین کلاس");Text(classAverage(roster)?.let{bidiLtr("%.2f".format(it))}?: "—",fontWeight=FontWeight.Bold)}}}
                     if(columns.isNotEmpty()&&speechColumn.isBlank())speechColumn=columns.first().name
                     var colMenu by remember{mutableStateOf(false)}
                     ExposedDropdownMenuBox(expanded=colMenu,onExpandedChange={colMenu=it}){OutlinedTextField(speechColumn,{speechColumn=it},readOnly=true,label={Text("ستون ثبت صوتی")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(colMenu)},modifier=Modifier.fillMaxWidth().menuAnchor());ExposedDropdownMenu(expanded=colMenu,onDismissRequest={colMenu=false}){columns.forEach{DropdownMenuItem(text={Text(it.name)},onClick={speechColumn=it.name;colMenu=false})}}}
                     Button(onClick={startSpeech()},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Mic,"");Text("ثبت نمره با صوت")}
                     if(speechText.isNotBlank())Card{Column(Modifier.padding(12.dp)){Text(speechText);Button(onClick={val parsed=parseVoice(speechText);val target=parsed?.let{p->roster.firstOrNull{it.name.contains(p.first,true)}};if(parsed!=null&&target!=null){val updated=students.map{if(it==target)it.copy(scores=it.scores+(speechColumn to parsed.second))else it};students=updated;persist(updated);snackbar="نمره ثبت شد."}else snackbar="نام دانش‌آموز را بررسی کنید.";speechText=""}){Text("تأیید و ثبت")}}}
-                    roster.forEach{st->Card{Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(st.name,fontWeight=FontWeight.Bold);Text(st.clazz+" · "+st.subject)};Text(average(st.scores)?.let{"%.2f".format(it)}?: "—",fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary)}
-                    columns.forEach{c->val currentScore=st.scores[c.name];var v by remember(st.studentNumber,st.name,st.clazz,st.subject,c.name,currentScore){mutableStateOf(currentScore?.toString().orEmpty())};OutlinedTextField(value=v,onValueChange={input->v=input;val normalized=normalizeDigits(input).replace("٫",".").replace(",",".");val n=normalized.toFloatOrNull();if(n!=null&&n in 0f..c.max){val updated=students.map{row->if(row.studentNumber==st.studentNumber&&row.clazz==st.clazz&&row.subject==st.subject)row.copy(scores=row.scores+(c.name to n))else row};students=updated;persist(updated)}else if(input.isBlank()){val updated=students.map{row->if(row.studentNumber==st.studentNumber&&row.clazz==st.clazz&&row.subject==st.subject)row.copy(scores=row.scores-c.name)else row};students=updated;persist(updated)}},label={Text(c.name+" (از "+c.max+")")},singleLine=true,modifier=Modifier.fillMaxWidth())}
+                    roster.forEach{st->Card{Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(st.name,fontWeight=FontWeight.Bold);Text(st.clazz+" · "+st.subject)};Text(average(st.scores)?.let{bidiLtr("%.2f".format(it))}?: "—",fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary)}
+                    columns.forEach{c->
+                        val currentScore=st.scores[c.name]
+                        var v by remember(st.studentNumber,st.name,st.clazz,st.subject,c.name,currentScore){mutableStateOf(currentScore?.toString().orEmpty())}
+                        OutlinedTextField(
+                            value=v,
+                            onValueChange={input->
+                                val normalized=normalizeScoreInput(input)
+                                v=normalized
+                                val n=normalized.toFloatOrNull()
+                                if(normalized.isBlank()) {
+                                    if(currentScore!=null) {
+                                        val updated=students.map{row->if(row.studentNumber==st.studentNumber&&row.clazz==st.clazz&&row.subject==st.subject)row.copy(scores=row.scores-c.name)else row}
+                                        if(persist(updated)) students=updated else v=currentScore.toString()
+                                    }
+                                } else if(n!=null&&n in 0f..c.max) {
+                                    val updated=students.map{row->if(row.studentNumber==st.studentNumber&&row.clazz==st.clazz&&row.subject==st.subject)row.copy(scores=row.scores+(c.name to n))else row}
+                                    if(persist(updated)) students=updated else v=currentScore?.toString().orEmpty()
+                                }
+                            },
+                            label={Text(c.name+" (از "+bidiLtr(c.max.toString())+")")},
+                            singleLine=true,
+                            modifier=Modifier.fillMaxWidth()
+                        )
+                    }
                     Text(scoreStatus(average(st.scores)),color=MaterialTheme.colorScheme.secondary)
                     }}}
                     Button(onClick={shareGradebook(ctx,selectedClass,selectedSubject,roster,columns)},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.FileDownload,"");Text("خروجی جدول در Word")}
@@ -387,7 +410,7 @@ class MainActivity: ComponentActivity() {
                 roster.forEach{st->
                     val status=day.optString(st.studentNumber)
                     Card { Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically){
-                        Column(Modifier.weight(1f)){Text(st.name,fontWeight=FontWeight.SemiBold);Text("شماره: ${st.studentNumber}",style=MaterialTheme.typography.bodySmall)}
+                        Column(Modifier.weight(1f)){Text(st.name,fontWeight=FontWeight.SemiBold);Text("شماره: ${bidiLtr(st.studentNumber)}",style=MaterialTheme.typography.bodySmall)}
                         FilterChip(selected=status=="present",onClick={
                             val next=JSONObject(attendance.toString());val date=JSONObject((next.optJSONObject(attendanceDate)?:JSONObject()).toString());val lesson=JSONObject((date.optJSONObject(lessonKey)?:JSONObject()).toString())
                             lesson.put(st.studentNumber,"present");date.put(lessonKey,lesson);next.put(attendanceDate,date);attendance=next
@@ -483,7 +506,7 @@ class MainActivity: ComponentActivity() {
                                     Checkbox(checked=st.studentNumber in classEditSelectedNumbers,onCheckedChange={checked->classEditSelectedNumbers=if(checked)classEditSelectedNumbers+st.studentNumber else classEditSelectedNumbers-st.studentNumber})
                                     Column(Modifier.weight(1f)) {
                                         Text(st.name,fontWeight=FontWeight.SemiBold)
-                                        Text("شماره: ${st.studentNumber}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("شماره: ${bidiLtr(st.studentNumber)}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
                             }
