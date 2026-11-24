@@ -398,8 +398,8 @@ class MainActivity: ComponentActivity() {
                 }}
                 Text("گزارش هر دانش‌آموز",fontWeight=FontWeight.Bold)
                 roster.forEach{st->
-                    val present=lessonDates.sumOf{key->if(attendance.optJSONObject(key)?.optJSONObject(lessonKey)?.optString(st.studentNumber)=="present")1 else 0}
-                    val absent=lessonDates.sumOf{key->if(attendance.optJSONObject(key)?.optJSONObject(lessonKey)?.optString(st.studentNumber)=="absent")1 else 0}
+                    val present=lessonDates.sumOf{key->if(attendance.optJSONObject(key)?.optJSONObject(lessonKey)?.optString(st.studentNumber)=="present") 1L else 0L}
+                    val absent=lessonDates.sumOf{key->if(attendance.optJSONObject(key)?.optJSONObject(lessonKey)?.optString(st.studentNumber)=="absent") 1L else 0L}
                     Card { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(3.dp)){
                         Text(st.name+" · "+st.studentNumber,fontWeight=FontWeight.SemiBold)
                         Text("حضور: $present · غیبت: $absent · ثبت‌نشده: ${(lessonDates.size-present-absent).coerceAtLeast(0)}")
