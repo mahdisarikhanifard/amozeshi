@@ -10,8 +10,8 @@ android {
         applicationId = "com.example.amozeshi"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -25,6 +25,7 @@ android {
 }
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.security:security-crypto:1.1.0")
     implementation("androidx.activity:activity-compose:1.10.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation(platform("androidx.compose:compose-bom:2025.01.00"))
