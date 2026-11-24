@@ -853,7 +853,8 @@ fun parseVoice(text:String):Pair<String,Float>?{
     val normalized=normalizeDigits(text).replace("٫",".").replace("،",".").replace(",",".")
     val nums=Regex("""\d+(?:\.\d+)?""").findAll(normalized).mapNotNull{it.value.toFloatOrNull()}.toList()
     if(nums.isEmpty())return null
-    val score=nums.last()
+    val beforeMaximum=normalized.substringBeforeLast("از",normalized)
+    val score=Regex("""\d+(?:\.\d+)?""").findAll(beforeMaximum).mapNotNull{it.value.toFloatOrNull()}.lastOrNull() ?: nums.last()
     val name=normalized.replace(Regex("""\d+(?:\.\d+)?"""),"").replace(Regex("""(نمره|امتحان|آزمون|درس|از|برای)"""),"").trim()
     return name.takeIf{it.isNotBlank()}?.let{it to score}
 }
