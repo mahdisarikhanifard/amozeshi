@@ -584,7 +584,7 @@ class MainActivity: ComponentActivity() {
                 },
                 title={Text("تأیید بازیابی پشتیبان")},
                 text={
-                    Text(bidiNumbers("این فایل شامل \${restorePreview.students.size} دانش‌آموز و \${restorePreview.columns.size} ستون نمره است. با تأیید، اطلاعات فعلی جایگزین می‌شود."))
+                    Text(bidiNumbers("این فایل شامل ${restorePreview.students.size} دانش‌آموز و ${restorePreview.columns.size} ستون نمره است. با تأیید، اطلاعات فعلی جایگزین می‌شود."))
                 },
                 confirmButton={
                     TextButton(onClick={
@@ -842,7 +842,7 @@ fun bidiNumbers(value:String):String {
     return pattern.replace(value) { match ->
         val before=value.getOrNull(match.range.first-1)
         val after=value.getOrNull(match.range.last+1)
-        if(before=='\u2066'||after=='\u2069') match.value else "\u2066\${match.value}\u2069"
+        if(before=='\u2066'||after=='\u2069') match.value else "\u2066${match.value}\u2069"
     }
 }
 fun makeBackup(students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String):String = JSONObject().put("app","YarMoallem").put("version",4).put("createdAt",java.time.Instant.now().toString()).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).put("attendance",JSONObject(attendance.toString())).put("timetable",timetable).toString(2)
