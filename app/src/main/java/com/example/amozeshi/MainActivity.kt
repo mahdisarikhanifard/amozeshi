@@ -123,8 +123,10 @@ class MainActivity: ComponentActivity() {
     }
     Scaffold(
         topBar={ TopAppBar(title={Text("یار معلم",fontWeight=FontWeight.Bold)}, actions={IconButton(onClick={selectedTab=5}){Icon(Icons.Default.Settings,"تنظیمات")}}) },
-        bottomBar={ NavigationBar { val labels=listOf("خانه","کلاس","نمرات","تحلیل","طرح درس","تنظیمات","حضور","برنامه"); val icons=listOf(Icons.Default.Home,Icons.Default.Groups,Icons.Default.Assignment,Icons.Default.Insights,Icons.Default.AutoAwesome,Icons.Default.Settings,Icons.Default.CheckCircle,Icons.Default.CalendarMonth)
-            labels.forEachIndexed { i,label -> NavigationBarItem(selected=selectedTab==i,onClick={selectedTab=i},icon={Icon(icons[i],label)},label={Text(label)}) } } },
+        bottomBar={ NavigationBar {
+            val tabs=listOf(0 to ("خانه" to Icons.Default.Home),1 to ("کلاس" to Icons.Default.Groups),2 to ("نمرات" to Icons.Default.Assignment),6 to ("حضور" to Icons.Default.CheckCircle),8 to ("بیشتر" to Icons.Default.Menu))
+            tabs.forEach { (index,item) -> NavigationBarItem(selected=selectedTab==index || (index==8 && selectedTab in listOf(3,4,5,7)),onClick={selectedTab=index},icon={Icon(item.second,item.first)},label={Text(item.first)}) }
+        } },
         snackbarHost={SnackbarHost(remember { SnackbarHostState() }) }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -295,6 +297,12 @@ class MainActivity: ComponentActivity() {
                         }
                     }
                 }
+            8 -> {
+                Text("بخش‌های برنامه",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+                listOf(3 to ("تحلیل عملکرد" to Icons.Default.Insights),4 to ("طرح درس و آزمون‌ساز" to Icons.Default.AutoAwesome),7 to ("برنامه هفتگی" to Icons.Default.CalendarMonth),5 to ("تنظیمات" to Icons.Default.Settings)).forEach{(tab,item)->
+                    Card(onClick={selectedTab=tab;settingsPage=""},modifier=Modifier.fillMaxWidth()){Row(Modifier.fillMaxWidth().padding(18.dp),verticalAlignment=Alignment.CenterVertically){Icon(item.second,null,tint=MaterialTheme.colorScheme.primary);Text(item.first,Modifier.weight(1f).padding(horizontal=12.dp),fontWeight=FontWeight.SemiBold);Icon(Icons.Default.ChevronLeft,null)}}
+                }
+            }
             6 -> {
                 Text("حضور و غیاب",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
                 val attendanceClasses=students.map{it.clazz}.distinct().sorted()
@@ -326,7 +334,7 @@ class MainActivity: ComponentActivity() {
                 Text("سوابق ماه انتخاب‌شده",fontWeight=FontWeight.Bold)
                 val monthRecords=attendance.keys().asSequence().filter{it.startsWith(attendanceDate.take(7))}.sorted().toList()
                 if(monthRecords.isEmpty()) Text("در این ماه سابقه‌ای ثبت نشده است.") else monthRecords.forEach{dateKey->val rec=attendance.optJSONObject(dateKey)?:JSONObject();Card{Column(Modifier.padding(10.dp)){Text(jalaliDateLabel(dateKey),fontWeight=FontWeight.Bold);Text("حاضر: "+rec.keys().asSequence().count{rec.optString(it)=="present"}+" · غایب: "+rec.keys().asSequence().count{rec.optString(it)=="absent"})}}}
-                roster.forEach{st->Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically){Text(st.name,Modifier.weight(1f));FilterChip(selected=day.optString(st.name)=="present",onClick={day.put(st.name,"present");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply();autoBackup(prefs,students,columns,attendance,timetable,apiKey)},label={Text("حاضر")});Spacer(Modifier.width(6.dp));FilterChip(selected=day.optString(st.name)=="absent",onClick={day.put(st.name,"absent");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply()},label={Text("غایب")})}}
+                roster.forEach{st->Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically){Text(st.name,Modifier.weight(1f));FilterChip(selected=day.optString(st.name)=="present",onClick={day.put(st.name,"present");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply();autoBackup(prefs,students,columns,attendance,timetable,apiKey)},label={Text("حاضر")});Spacer(Modifier.width(6.dp));FilterChip(selected=day.optString(st.name)=="absent",onClick={day.put(st.name,"absent");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply();autoBackup(prefs,students,columns,attendance,timetable,apiKey)},label={Text("غایب")})}}
                 Button(
                     onClick = {
                         val report = roster.joinToString("\n") { st ->
