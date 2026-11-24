@@ -177,7 +177,7 @@ class MainActivity: ComponentActivity() {
                             Column(Modifier.padding(16.dp), verticalArrangement=Arrangement.spacedBy(8.dp)) {
                                 Text(group.first, fontWeight=FontWeight.Bold, style=MaterialTheme.typography.titleMedium)
                                 Text(group.second, color=MaterialTheme.colorScheme.primary)
-                                Text("${list.size} دانش‌آموز · ${list.count{it.scores.isNotEmpty()}} دارای نمره")
+                                Text(bidiNumbers("${list.size} دانش‌آموز · ${list.count{it.scores.isNotEmpty()}} دارای نمره"))
                                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                                     OutlinedButton(onClick={selectedClass=group.first;selectedSubject=group.second;selectedTab=2}, modifier=Modifier.weight(1f)){Text("دفتر نمرات")}
                                     OutlinedButton(onClick={selectedClass=group.first;selectedSubject=group.second;selectedTab=3}, modifier=Modifier.weight(1f)){Text("تحلیل")}
@@ -211,7 +211,7 @@ class MainActivity: ComponentActivity() {
                     var colMenu by remember{mutableStateOf(false)}
                     ExposedDropdownMenuBox(expanded=colMenu,onExpandedChange={colMenu=it}){OutlinedTextField(speechColumn,{speechColumn=it},readOnly=true,label={Text("ستون ثبت صوتی")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(colMenu)},modifier=Modifier.fillMaxWidth().menuAnchor());ExposedDropdownMenu(expanded=colMenu,onDismissRequest={colMenu=false}){columns.forEach{DropdownMenuItem(text={Text(it.name)},onClick={speechColumn=it.name;colMenu=false})}}}
                     Button(onClick={startSpeech()},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Mic,"");Text("ثبت نمره با صوت")}
-                    if(speechText.isNotBlank())Card{Column(Modifier.padding(12.dp)){Text(speechText);Button(onClick={val parsed=parseVoice(speechText);val target=parsed?.let{p->roster.firstOrNull{it.name.contains(p.first,true)}};if(parsed!=null&&target!=null){val updated=students.map{if(it==target)it.copy(scores=it.scores+(speechColumn to parsed.second))else it};students=updated;persist(updated);snackbar="نمره ثبت شد."}else snackbar="نام دانش‌آموز را بررسی کنید.";speechText=""}){Text("تأیید و ثبت")}}}
+                    if(speechText.isNotBlank())Card{Column(Modifier.padding(12.dp)){Text(bidiNumbers(speechText));Button(onClick={val parsed=parseVoice(speechText);val target=parsed?.let{p->roster.firstOrNull{it.name.contains(p.first,true)}};if(parsed!=null&&target!=null){val updated=students.map{if(it==target)it.copy(scores=it.scores+(speechColumn to parsed.second))else it};if(persist(updated)){students=updated;snackbar="نمره ثبت و ذخیره شد."}}else snackbar="نام دانش‌آموز را بررسی کنید.";speechText=""}){Text("تأیید و ثبت")}}}
                     roster.forEach{st->Card{Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(st.name,fontWeight=FontWeight.Bold);Text(st.clazz+" · "+st.subject)};Text(average(st.scores)?.let{bidiLtr("%.2f".format(it))}?: "—",fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary)}
                     columns.forEach{c->
                         val currentScore=st.scores[c.name]
@@ -263,9 +263,9 @@ class MainActivity: ComponentActivity() {
                     val strongestColumn=columnAnalysis.filter{it.second!=null}.maxByOrNull{it.second!!}
                     val weakestColumn=columnAnalysis.filter{it.second!=null}.minByOrNull{it.second!!}
                     val high=report.count{(average(it.scores)?:-1f)>=17};val low=report.count{val a=average(it.scores);a!=null&&a<12};val missing=report.count{it.scores.isEmpty()}
-                    Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text(selectedClass+" · "+selectedSubject,fontWeight=FontWeight.Bold);Text("میانگین کلاس: "+(classAvg?.let{"%.2f از ۲۰".format(it)}?: "—"),style=MaterialTheme.typography.titleLarge);Text("میانه: "+(median?.let{"%.2f".format(it)}?: "—")+" | پوشش ثبت نمرات: "+completion+"٪");LinearProgressIndicator(progress={completion/100f},modifier=Modifier.fillMaxWidth());Text("دانش‌آموزان: "+report.size+" | دارای نمره: "+scoredCount+" | عملکرد قوی (۱۷+): "+high+" | نیازمند توجه (<۱۲): "+low+" | بدون نمره: "+missing);Text("میانگین فقط از نمرات موجود محاسبه می‌شود؛ تکمیل ارزیابی برای نتیجه دقیق‌تر ضروری است.",style=MaterialTheme.typography.bodySmall)}}
-                    Text("تحلیل نقاط قوت و نیازمند تقویت",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);if(strongestColumn!=null)Text("قوی‌ترین حوزه: "+strongestColumn.first.name+" ("+"%.2f".format(strongestColumn.second)+")");if(weakestColumn!=null)Text("نیازمند تقویت: "+weakestColumn.first.name+" ("+"%.2f".format(weakestColumn.second)+")");Text("میانگین هر ستون",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);columnAnalysis.forEach{(col,avg)->Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(col.name);Text(avg?.let{"%.2f از ۲۰".format(it)}?: "بدون نمره",fontWeight=FontWeight.Bold)};LinearProgressIndicator(progress={((avg?:0f)/20f).coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth())}}};if(bestStudents.isNotEmpty()){Text("۳ دانش‌آموز برتر",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);bestStudents.forEach{(st,avg)->Text("${st.name} — %.2f".format(avg))}};Text("توزیع میانگین",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
-                    listOf("۱۸ تا ۲۰" to report.count{(average(it.scores)?:-1f)>=18},"۱۶ تا ۱۸" to report.count{val a=average(it.scores);a!=null&&a>=16&&a<18},"۱۴ تا ۱۶" to report.count{val a=average(it.scores);a!=null&&a>=14&&a<16},"۱۲ تا ۱۴" to report.count{val a=average(it.scores);a!=null&&a>=12&&a<14},"کمتر از ۱۲" to low,"بدون نمره" to missing).forEach{(label,count)->Row(verticalAlignment=Alignment.CenterVertically){Text(label,Modifier.weight(1f));LinearProgressIndicator(progress={if(report.isEmpty())0f else count.toFloat()/report.size},Modifier.weight(1f));Text(count.toString(),Modifier.width(32.dp))}}
+                    Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text(selectedClass+" · "+selectedSubject,fontWeight=FontWeight.Bold);Text(bidiNumbers("میانگین کلاس: "+(classAvg?.let{"%.2f از ۲۰".format(it)}?: "—")),style=MaterialTheme.typography.titleLarge);Text(bidiNumbers("میانه: "+(median?.let{"%.2f".format(it)}?: "—")+" | پوشش ثبت نمرات: "+completion+"٪"));LinearProgressIndicator(progress={completion/100f},modifier=Modifier.fillMaxWidth());Text(bidiNumbers("دانش‌آموزان: "+report.size+" | دارای نمره: "+scoredCount+" | عملکرد قوی (۱۷+): "+high+" | نیازمند توجه (<۱۲): "+low+" | بدون نمره: "+missing));Text("میانگین فقط از نمرات موجود محاسبه می‌شود؛ تکمیل ارزیابی برای نتیجه دقیق‌تر ضروری است.",style=MaterialTheme.typography.bodySmall)}}
+                    Text("تحلیل نقاط قوت و نیازمند تقویت",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);if(strongestColumn!=null)Text(bidiNumbers("قوی‌ترین حوزه: "+strongestColumn.first.name+" ("+"%.2f".format(strongestColumn.second)+")"));if(weakestColumn!=null)Text(bidiNumbers("نیازمند تقویت: "+weakestColumn.first.name+" ("+"%.2f".format(weakestColumn.second)+")"));Text("میانگین هر ستون",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);columnAnalysis.forEach{(col,avg)->Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(col.name);Text(avg?.let{"%.2f از ۲۰".format(it)}?: "بدون نمره",fontWeight=FontWeight.Bold)};LinearProgressIndicator(progress={((avg?:0f)/20f).coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth())}}};if(bestStudents.isNotEmpty()){Text("۳ دانش‌آموز برتر",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);bestStudents.forEach{(st,avg)->Text(bidiNumbers("${st.name} — %.2f".format(avg)))}};Text("توزیع میانگین",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
+                    listOf("۱۸ تا ۲۰" to report.count{(average(it.scores)?:-1f)>=18},"۱۶ تا ۱۸" to report.count{val a=average(it.scores);a!=null&&a>=16&&a<18},"۱۴ تا ۱۶" to report.count{val a=average(it.scores);a!=null&&a>=14&&a<16},"۱۲ تا ۱۴" to report.count{val a=average(it.scores);a!=null&&a>=12&&a<14},"کمتر از ۱۲" to low,"بدون نمره" to missing).forEach{(label,count)->Row(verticalAlignment=Alignment.CenterVertically){Text(label,Modifier.weight(1f));LinearProgressIndicator(progress={if(report.isEmpty())0f else count.toFloat()/report.size},Modifier.weight(1f));Text(bidiNumbers(count.toString()),Modifier.width(32.dp))}}
                     Button(onClick={shareAnalysis(ctx,selectedClass,selectedSubject,report,columns)},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.FileDownload,"");Text("خروجی تحلیل در Word")}
                     report.forEach{StudentAnalysisCard(it,columns,report)}
                 }
@@ -398,12 +398,12 @@ class MainActivity: ComponentActivity() {
                 val lessonKey=selectedClass+"::"+selectedSubject
                 val dateRecord=attendance.optJSONObject(attendanceDate)?:JSONObject()
                 val day=dateRecord.optJSONObject(lessonKey)?:JSONObject()
-                Text("کلاس: $selectedClass · درس: $selectedSubject",fontWeight=FontWeight.SemiBold)
+                Text(bidiNumbers("کلاس: $selectedClass · درس: $selectedSubject"),fontWeight=FontWeight.SemiBold)
                 Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){
                     Row(Modifier.fillMaxWidth().padding(14.dp),horizontalArrangement=Arrangement.SpaceBetween){
-                        Text("حاضر: "+roster.count{day.optString(it.studentNumber)=="present"})
-                        Text("غایب: "+roster.count{day.optString(it.studentNumber)=="absent"})
-                        Text("ثبت‌نشده: "+roster.count{day.optString(it.studentNumber).isBlank()})
+                        Text(bidiNumbers("حاضر: "+roster.count{day.optString(it.studentNumber)=="present"}))
+                        Text(bidiNumbers("غایب: "+roster.count{day.optString(it.studentNumber)=="absent"}))
+                        Text(bidiNumbers("ثبت‌نشده: "+roster.count{day.optString(it.studentNumber).isBlank()}))
                     }
                 }
                 Text("ثبت وضعیت روزانه",fontWeight=FontWeight.Bold)
@@ -429,9 +429,9 @@ class MainActivity: ComponentActivity() {
                 val totalPresent=lessonDates.sumOf{key->val rec=attendance.optJSONObject(key)?.optJSONObject(lessonKey)?:JSONObject();roster.count{rec.optString(it.studentNumber)=="present"}}
                 val totalAbsent=lessonDates.sumOf{key->val rec=attendance.optJSONObject(key)?.optJSONObject(lessonKey)?:JSONObject();roster.count{rec.optString(it.studentNumber)=="absent"}}
                 Card { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
-                    Text("روزهای دارای ثبت: ${lessonDates.size}")
+                    Text(bidiNumbers("روزهای دارای ثبت: ${lessonDates.size}"))
                     Text("مجموع حضورها: $totalPresent · مجموع غیبت‌ها: $totalAbsent")
-                    Text("درصد حضور ثبت‌شده: "+if(totalPresent+totalAbsent==0)"—" else "${(totalPresent*100/(totalPresent+totalAbsent))}%")
+                    Text(bidiNumbers("درصد حضور ثبت‌شده: "+if(totalPresent+totalAbsent==0)"—" else "${(totalPresent*100/(totalPresent+totalAbsent))}%"))
                 }}
                 Text("گزارش هر دانش‌آموز",fontWeight=FontWeight.Bold)
                 roster.forEach{st->
@@ -439,7 +439,7 @@ class MainActivity: ComponentActivity() {
                     val absent=lessonDates.sumOf{key->if(attendance.optJSONObject(key)?.optJSONObject(lessonKey)?.optString(st.studentNumber)=="absent") 1L else 0L}
                     Card { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(3.dp)){
                         Text(st.name+" · "+st.studentNumber,fontWeight=FontWeight.SemiBold)
-                        Text("حضور: $present · غیبت: $absent · ثبت‌نشده: ${(lessonDates.size-present-absent).coerceAtLeast(0)}")
+                        Text(bidiNumbers("حضور: $present · غیبت: $absent · ثبت‌نشده: ${(lessonDates.size-present-absent).coerceAtLeast(0)}"))
                     }}
                 }
                 Text("سوابق ماه انتخاب‌شده",fontWeight=FontWeight.Bold)
@@ -448,7 +448,7 @@ class MainActivity: ComponentActivity() {
                     val rec=attendance.optJSONObject(dateKey)?.optJSONObject(lessonKey)?:JSONObject()
                     Card { Column(Modifier.padding(10.dp)){
                         Text(jalaliDateLabel(dateKey),fontWeight=FontWeight.Bold)
-                        Text("حاضر: ${roster.count{rec.optString(it.studentNumber)=="present"}} · غایب: ${roster.count{rec.optString(it.studentNumber)=="absent"}}")
+                        Text(bidiNumbers("حاضر: ${roster.count{rec.optString(it.studentNumber)=="present"}} · غایب: ${roster.count{rec.optString(it.studentNumber)=="absent"}}"))
                     }}
                 }
                 Button(onClick={
@@ -466,7 +466,7 @@ class MainActivity: ComponentActivity() {
                 val timetableRows=timetableEdit.lines().mapNotNull{line->val p=line.split("|").map{it.trim()};if(p.size>=4&&p[0].isNotBlank())p else null}
                 if(timetableRows.isNotEmpty()) {
                     Text("پیش‌نمایش جدول",fontWeight=FontWeight.Bold)
-                    timetableRows.forEach { row -> Card { Row(Modifier.fillMaxWidth().padding(8.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){row.take(4).forEach{Text(it,Modifier.weight(1f),style=MaterialTheme.typography.bodySmall)}} } }
+                    timetableRows.forEach { row -> Card { Row(Modifier.fillMaxWidth().padding(8.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){row.take(4).forEach{Text(bidiNumbers(it),Modifier.weight(1f),style=MaterialTheme.typography.bodySmall)}} } }
                 }
                 Button(onClick={timetable=timetableEdit;prefs.edit().putString("timetable",timetable).apply();autoBackup(prefs,students,columns,attendance,timetable,apiKey);snackbar="برنامه هفتگی ذخیره شد."},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Save,"");Text("ذخیره برنامه")}
                 OutlinedButton(
@@ -510,7 +510,7 @@ class MainActivity: ComponentActivity() {
                                     }
                                 }
                             }
-                            Text("${classEditSelectedNumbers.size} دانش‌آموز انتخاب شده",color=MaterialTheme.colorScheme.primary)
+                            Text(bidiNumbers("${classEditSelectedNumbers.size} دانش‌آموز انتخاب شده"),color=MaterialTheme.colorScheme.primary)
                         }
                     },
                     confirmButton={
@@ -576,6 +576,58 @@ class MainActivity: ComponentActivity() {
                 dismissButton={TextButton(onClick={editStudent=null}){Text("انصراف")}}
             )
 
+            val restorePreview=pendingRestore
+            if(restorePreview!=null) AlertDialog(
+                onDismissRequest={
+                    pendingRestore=null
+                    restoreMessage="بازیابی لغو شد؛ اطلاعات فعلی حفظ شد."
+                },
+                title={Text("تأیید بازیابی پشتیبان")},
+                text={
+                    Text(bidiNumbers("این فایل شامل \${restorePreview.students.size} دانش‌آموز و \${restorePreview.columns.size} ستون نمره است. با تأیید، اطلاعات فعلی جایگزین می‌شود."))
+                },
+                confirmButton={
+                    TextButton(onClick={
+                        val snapshot=pendingRestore
+                        if(snapshot!=null) {
+                            val restoredAttendance=JSONObject(snapshot.attendance.toString())
+                            val saved=try {
+                                prefs.edit()
+                                    .putString("students",saveStudents(snapshot.students))
+                                    .putString("columns",saveColumns(snapshot.columns))
+                                    .putString("attendance",restoredAttendance.toString())
+                                    .putString("timetable",snapshot.timetable)
+                                    .commit()
+                            } catch(_:Exception) { false }
+                            if(saved) {
+                                students=snapshot.students
+                                columns=snapshot.columns
+                                attendance=restoredAttendance
+                                timetable=snapshot.timetable
+                                timetableEdit=snapshot.timetable
+                                selectedClass=snapshot.students.firstOrNull()?.clazz.orEmpty()
+                                selectedSubject=snapshot.students.firstOrNull{it.clazz==selectedClass}?.subject.orEmpty()
+                                classInput=selectedClass
+                                subjectInput=selectedSubject
+                                autoBackup(prefs,snapshot.students,snapshot.columns,restoredAttendance,snapshot.timetable,apiKey)
+                                restoreMessage="بازیابی کامل شد؛ اطلاعات پشتیبان جایگزین اطلاعات قبلی شد."
+                                snackbar="بازیابی اطلاعات با موفقیت انجام شد."
+                            } else {
+                                restoreMessage="بازیابی ذخیره نشد؛ داده‌های فعلی در صفحه حفظ شدند."
+                                snackbar="ذخیره بازیابی ناموفق بود؛ اطلاعات قبلی در صفحه باقی ماند."
+                            }
+                            pendingRestore=null
+                        }
+                    }){Text("تأیید و جایگزینی")}
+                },
+                dismissButton={
+                    TextButton(onClick={
+                        pendingRestore=null
+                        restoreMessage="بازیابی لغو شد؛ اطلاعات فعلی حفظ شد."
+                    }){Text("انصراف")}
+                }
+            )
+
         }
     }
 }
@@ -633,7 +685,7 @@ class MainActivity: ComponentActivity() {
         }
         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween,modifier=Modifier.fillMaxWidth()) {
             Text("کلاس‌های من",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-            Text("${classes.size} کلاس",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(bidiNumbers("${classes.size} کلاس"),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if(classes.isEmpty()) {
             Card { Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -650,12 +702,12 @@ class MainActivity: ComponentActivity() {
                             Icon(Icons.Default.Groups,null,Modifier.padding(10.dp),tint=MaterialTheme.colorScheme.primary)
                         }
                         Column(Modifier.weight(1f).padding(horizontal=10.dp)) {
-                            Text(className,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium)
-                            Text("${roster.size} دانش‌آموز · ${subjects.size} درس",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(bidiNumbers(className),fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium)
+                            Text(bidiNumbers("${roster.size} دانش‌آموز · ${subjects.size} درس"),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Text("${roster.count{it.scores.isNotEmpty()}} نمره‌دار",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
+                        Text(bidiNumbers("${roster.count{it.scores.isNotEmpty()}} نمره‌دار"),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
                     }
-                    Text(subjects.joinToString("  •  "),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2)
+                    Text(bidiNumbers(subjects.joinToString("  •  ")),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2)
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick={onSelectClass(className);onNavigate(2)},modifier=Modifier.weight(1f)){Text("نمرات")}
                         OutlinedButton(onClick={onSelectClass(className);onNavigate(3)},modifier=Modifier.weight(1f)){Text("تحلیل")}
@@ -737,12 +789,12 @@ class MainActivity: ComponentActivity() {
     }
     Card { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
         Text(s.name,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium)
-        Text("${s.clazz} · ${s.subject}",color=MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("میانگین نمرات ثبت‌شده: ${avg?.let{"%.2f از ۲۰".format(it)} ?: "بدون نمره"}",fontWeight=FontWeight.SemiBold)
-        Text("تکمیل ارزیابی: $completed از ${columns.size} ستون ($completion٪)")
-        if(delta!=null) Text(if(delta>=0) "بالاتر از میانگین هم‌کلاسی‌ها به میزان %.2f".format(delta) else "پایین‌تر از میانگین هم‌کلاسی‌ها به میزان %.2f".format(-delta))
-        if(strongest!=null) Text("نقطه قوت: ${strongest.key} (${"%.2f".format(strongest.value)})")
-        if(weakest!=null&&weakest.key!=strongest?.key) Text("نیازمند تقویت: ${weakest.key} (${"%.2f".format(weakest.value)})")
+        Text(bidiNumbers("${s.clazz} · ${s.subject}"),color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(bidiNumbers("میانگین نمرات ثبت‌شده: ${avg?.let{"%.2f از ۲۰".format(it)} ?: "بدون نمره"}"),fontWeight=FontWeight.SemiBold)
+        Text(bidiNumbers("تکمیل ارزیابی: $completed از ${columns.size} ستون ($completion٪)"))
+        if(delta!=null) Text(bidiNumbers(if(delta>=0) "بالاتر از میانگین هم‌کلاسی‌ها به میزان %.2f".format(delta) else "پایین‌تر از میانگین هم‌کلاسی‌ها به میزان %.2f".format(-delta)))
+        if(strongest!=null) Text(bidiNumbers("نقطه قوت: ${strongest.key} (${"%.2f".format(strongest.value)})"))
+        if(weakest!=null&&weakest.key!=strongest?.key) Text(bidiNumbers("نیازمند تقویت: ${weakest.key} (${"%.2f".format(weakest.value)})"))
         if(missing.isNotEmpty()) Text("ارزیابی‌های ثبت‌نشده: ${missing.joinToString("، ")}")
         Text("پیشنهاد آموزشی: $recommendation",color=MaterialTheme.colorScheme.primary)
     } }
@@ -785,6 +837,14 @@ fun jalaliDateLabel(iso:String):String {
 fun normalizeDigits(s:String):String { val p="۰۱۲۳۴۵۶۷۸۹";val a="٠١٢٣٤٥٦٧٨٩";return s.map{ch->when{ch in p->(ch.code-p[0].code).toString();ch in a->(ch.code-a[0].code).toString();else->ch.toString()}}.joinToString("") }
 fun normalizeScoreInput(value:String):String = normalizeDigits(value).replace("٫",".").replace("٬","").replace("،",".").replace(",",".").filter{it.isDigit()||it=='.'}
 fun bidiLtr(value:String):String = "\u2066"+value+"\u2069"
+fun bidiNumbers(value:String):String {
+    val pattern=Regex("[0-9۰-۹٠-٩]+(?:[.,٫٬][0-9۰-۹٠-٩]+)*")
+    return pattern.replace(value) { match ->
+        val before=value.getOrNull(match.range.first-1)
+        val after=value.getOrNull(match.range.last+1)
+        if(before=='\u2066'||after=='\u2069') match.value else "\u2066\${match.value}\u2069"
+    }
+}
 fun makeBackup(students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String):String = JSONObject().put("app","YarMoallem").put("version",4).put("createdAt",java.time.Instant.now().toString()).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).put("attendance",JSONObject(attendance.toString())).put("timetable",timetable).toString(2)
 fun autoBackup(prefs:android.content.SharedPreferences,students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String,apiKey:String=""){try{val json=makeBackup(students,columns,attendance,timetable);val e=prefs.edit().putString("auto_backup_latest",json).putString("auto_backup_time",java.time.Instant.now().toString());for(i in 6 downTo 1){val old=prefs.getString("auto_backup_"+i,null);if(old!=null)e.putString("auto_backup_"+(i+1),old)};e.putString("auto_backup_1",json);if(!e.commit())throw IllegalStateException("auto backup commit failed")}catch(_:Exception){}}
 fun average(scores:Map<String,Float>):Float?=scores.values.takeIf{it.isNotEmpty()}?.average()?.toFloat()
@@ -876,6 +936,26 @@ fun parseBackup(raw:String):BackupSnapshot {
     }
     require(parsedColumns.map{it.name}.distinct().size==parsedColumns.size) {"نام ستون‌های نمره تکراری است"}
     val attendance=root.optJSONObject("attendance") ?: JSONObject()
+    val dateKeys=attendance.keys()
+    while(dateKeys.hasNext()) {
+        val dateKey=dateKeys.next()
+        val dateObject=attendance.getJSONObject(dateKey)
+        val recordKeys=dateObject.keys()
+        while(recordKeys.hasNext()) {
+            val recordKey=recordKeys.next()
+            val record=dateObject.get(recordKey)
+            if(record is JSONObject) {
+                val studentKeys=record.keys()
+                while(studentKeys.hasNext()) {
+                    val studentKey=studentKeys.next()
+                    val status=record.getString(studentKey)
+                    require(status=="present"||status=="absent") {"وضعیت حضور و غیاب در فایل پشتیبان معتبر نیست"}
+                }
+            } else {
+                require(record is String&&(record=="present"||record=="absent")) {"ساختار حضور و غیاب در فایل پشتیبان معتبر نیست"}
+            }
+        }
+    }
     val timetable=if(root.has("timetable")) {
         val value=root.get("timetable")
         require(value is String) {"ساختار برنامه هفتگی معتبر نیست"}
