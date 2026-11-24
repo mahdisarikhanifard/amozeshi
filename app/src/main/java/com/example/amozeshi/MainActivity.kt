@@ -211,7 +211,7 @@ class MainActivity: ComponentActivity() {
                     var colMenu by remember{mutableStateOf(false)}
                     ExposedDropdownMenuBox(expanded=colMenu,onExpandedChange={colMenu=it}){OutlinedTextField(speechColumn,{speechColumn=it},readOnly=true,label={Text("ستون ثبت صوتی")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(colMenu)},modifier=Modifier.fillMaxWidth().menuAnchor());ExposedDropdownMenu(expanded=colMenu,onDismissRequest={colMenu=false}){columns.forEach{DropdownMenuItem(text={Text(it.name)},onClick={speechColumn=it.name;colMenu=false})}}}
                     Button(onClick={startSpeech()},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Mic,"");Text("ثبت نمره با صوت")}
-                    if(speechText.isNotBlank())Card{Column(Modifier.padding(12.dp)){Text(bidiNumbers(speechText));Button(onClick={val parsed=parseVoice(speechText);val target=parsed?.let{p->roster.firstOrNull{it.name.contains(p.first,true)}};if(parsed!=null&&target!=null){val updated=students.map{if(it==target)it.copy(scores=it.scores+(speechColumn to parsed.second))else it};if(persist(updated)){students=updated;snackbar="نمره ثبت و ذخیره شد."}}else snackbar="نام دانش‌آموز را بررسی کنید.";speechText=""}){Text("تأیید و ثبت")}}}
+                    if(speechText.isNotBlank())Card{Column(Modifier.padding(12.dp)){Text(bidiNumbers(speechText));Button(onClick={val parsed=parseVoice(speechText);val target=parsed?.let{p->roster.firstOrNull{it.name.contains(p.first,true)}};if(parsed!=null&&target!=null){val maxScore=columns.firstOrNull{it.name==speechColumn}?.max ?: 20f;if(speechColumn.isBlank())snackbar="ابتدا یک ستون نمره تعریف کنید." else if(parsed.second !in 0f..maxScore)snackbar="نمره باید بین صفر تا ${bidiLtr(maxScore.toString())} باشد." else {val updated=students.map{if(it==target)it.copy(scores=it.scores+(speechColumn to parsed.second))else it};if(persist(updated)){students=updated;snackbar="نمره ثبت و ذخیره شد."}}}else snackbar="نام دانش‌آموز را بررسی کنید.";speechText=""}){Text("تأیید و ثبت")}}}
                     roster.forEach{st->Card{Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(st.name,fontWeight=FontWeight.Bold);Text(bidiNumbers(st.clazz+" · "+st.subject))};Text(average(st.scores)?.let{bidiLtr("%.2f".format(it))}?: "—",fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary)}
                     columns.forEach{c->
                         val currentScore=st.scores[c.name]
@@ -484,7 +484,7 @@ class MainActivity: ComponentActivity() {
                 }
             }
             }
-            if(snackbar.isNotBlank()) Text(snackbar,color=MaterialTheme.colorScheme.primary)
+            if(snackbar.isNotBlank()) Text(bidiNumbers(snackbar),color=MaterialTheme.colorScheme.primary)
             if(showClassEditor) {
                 val sourceRoster=students.filter{it.clazz==classEditSource}.distinctBy{it.studentNumber}.sortedBy{it.name}
                 AlertDialog(
@@ -836,7 +836,7 @@ fun jalaliDateLabel(iso:String):String {
     } catch(_:Exception) { iso }
 }
 fun normalizeDigits(s:String):String { val p="۰۱۲۳۴۵۶۷۸۹";val a="٠١٢٣٤٥٦٧٨٩";return s.map{ch->when{ch in p->(ch.code-p[0].code).toString();ch in a->(ch.code-a[0].code).toString();else->ch.toString()}}.joinToString("") }
-fun normalizeScoreInput(value:String):String = normalizeDigits(value).replace("٫",".").replace("٬","").replace("،",".").replace(",",".").filter{it.isDigit()||it=='.'}
+fun normalizeScoreInput(value:String):String = normalizeDigits(value).replace("٫",".").replace("٬","").replace("،",".").replace(",",".").filter{it.isDigit()||it=='.'||it=='-'}
 fun bidiLtr(value:String):String = "\u2066"+value+"\u2069"
 fun bidiNumbers(value:String):String {
     val pattern=Regex("[0-9۰-۹٠-٩]+(?:[.,٫٬][0-9۰-۹٠-٩]+)*")
