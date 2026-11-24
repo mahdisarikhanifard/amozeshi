@@ -30,6 +30,10 @@ import androidx.compose.ui.unit.dp
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 
 data class Student(val name:String, val clazz:String, val subject:String, val scores:Map<String,Float>)
 data class ScoreColumn(val name:String, val max:Float=20f, val weight:Float=1f)
@@ -42,6 +46,7 @@ class MainActivity: ComponentActivity() {
 @Composable fun App() {
     val ctx= LocalContext.current
     val prefs=ctx.getSharedPreferences("yar_moallem",0)
+    val securePrefs=remember { createSecurePreferences(ctx) }
     var students by remember { mutableStateOf(loadStudents(prefs.getString("students","[]") ?: "[]")) }
     var columns by remember { mutableStateOf(loadColumns(prefs.getString("columns","[\"مستمر\",\"شفاهی\",\"آزمون\"]") ?: "[]")) }
     var selectedTab by remember { mutableStateOf(0) }
@@ -66,9 +71,19 @@ class MainActivity: ComponentActivity() {
     var speechText by remember { mutableStateOf("") }
     var speechColumn by remember { mutableStateOf("") }
     var snackbar by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf(prefs.getString("api_key","") ?: "") }
+    var apiKey by remember { mutableStateOf(securePrefs.getString("api_key",null) ?: prefs.getString("api_key","") ?: "") }
+    var showApiKey by remember { mutableStateOf(false) }
+    var apiTestLoading by remember { mutableStateOf(false) }
+    var apiTestResult by remember { mutableStateOf("") }
     var editStudent by remember { mutableStateOf<Student?>(null) }
     val scope=rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        if (securePrefs.getString("api_key",null)==null) {
+            val legacy=prefs.getString("api_key",null)
+            if (!legacy.isNullOrBlank()) securePrefs.edit().putString("api_key",legacy).apply()
+            prefs.edit().remove("api_key").apply()
+        }
+    }
     val exportLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if(uri!=null) try { ctx.contentResolver.openOutputStream(uri)?.use { it.write(makeBackup(students,columns,attendance,timetable,apiKey).toByteArray(Charsets.UTF_8)) }; snackbar="فایل پشتیبان ذخیره شد." } catch(e:Exception){snackbar="ذخیره پشتیبان ناموفق بود: ${e.message}"}
     }
@@ -82,13 +97,14 @@ class MainActivity: ComponentActivity() {
             val newAttendance=root.optJSONObject("attendance") ?: JSONObject()
             val newTimetable=root.optString("timetable","")
             students=newStudents;columns=newColumns;attendance=newAttendance;timetable=newTimetable;timetableEdit=newTimetable;apiKey=root.optString("apiKey",apiKey)
-            prefs.edit().putString("students",saveStudents(newStudents)).putString("columns",saveColumns(newColumns)).putString("attendance",newAttendance.toString()).putString("timetable",newTimetable).putString("api_key",apiKey).apply()
-            autoBackup(prefs,newStudents,newColumns,newAttendance,newTimetable)
+            securePrefs.edit().putString("api_key",apiKey).apply()
+            prefs.edit().putString("students",saveStudents(newStudents)).putString("columns",saveColumns(newColumns)).putString("attendance",newAttendance.toString()).putString("timetable",newTimetable).remove("api_key").apply()
+            autoBackup(prefs,newStudents,newColumns,newAttendance,newTimetable,apiKey)
             snackbar="بازیابی کامل شد؛ ${newStudents.size} دانش‌آموز بازیابی شد."
         } catch(e:Exception){snackbar="بازیابی انجام نشد؛ اطلاعات قبلی حفظ شد. ${e.message}"}
     }
     var lessonLoading by remember { mutableStateOf(false) }
-    fun persist(studentData:List<Student> = students, columnData:List<ScoreColumn> = columns) { prefs.edit().putString("students",saveStudents(studentData)).putString("columns",saveColumns(columnData)).apply(); autoBackup(prefs,studentData,columnData,attendance,timetable) }
+    fun persist(studentData:List<Student> = students, columnData:List<ScoreColumn> = columns) { prefs.edit().putString("students",saveStudents(studentData)).putString("columns",saveColumns(columnData)).apply(); autoBackup(prefs,studentData,columnData,attendance,timetable,apiKey) }
     val speechLauncher=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val spoken=result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty()
         speechText=spoken
@@ -153,8 +169,7 @@ class MainActivity: ComponentActivity() {
                 }
                 2 -> {
                     Text("دفتر نمرات",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-                    Text("انتخاب کلاس و درس؛ ثبت نمرات و مشاهده خلاصه وضعیت.")
-                    val classOptions=students.map{it.clazz}.distinct().sorted()
+                        val classOptions=students.map{it.clazz}.distinct().sorted()
                     var classMenu by remember{mutableStateOf(false)}
                     ExposedDropdownMenuBox(expanded=classMenu,onExpandedChange={classMenu=it}){OutlinedTextField(selectedClass,{selectedClass=it},readOnly=true,label={Text("کلاس")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(classMenu)},modifier=Modifier.fillMaxWidth().menuAnchor());ExposedDropdownMenu(expanded=classMenu,onDismissRequest={classMenu=false}){classOptions.forEach{DropdownMenuItem(text={Text(it)},onClick={selectedClass=it;classMenu=false})}}}
                     val subjectOptions=students.filter{it.clazz==selectedClass}.map{it.subject}.distinct().sorted()
@@ -175,7 +190,6 @@ class MainActivity: ComponentActivity() {
                 }
                 3 -> {
                     Text("تحلیل عملکرد کلاس",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-                    Text("تحلیل بر اساس کلاس و درس انتخاب‌شده؛ شاخص‌ها شفاف و قابل پیگیری‌اند.")
                     val classOptions=students.map{it.clazz}.distinct().sorted()
                     var classMenu by remember{mutableStateOf(false)}
                     ExposedDropdownMenuBox(expanded=classMenu,onExpandedChange={classMenu=it}){OutlinedTextField(selectedClass,{selectedClass=it},readOnly=true,label={Text("کلاس")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(classMenu)},modifier=Modifier.fillMaxWidth().menuAnchor());ExposedDropdownMenu(expanded=classMenu,onDismissRequest={classMenu=false}){classOptions.forEach{DropdownMenuItem(text={Text(it)},onClick={selectedClass=it;classMenu=false})}}}
@@ -249,7 +263,7 @@ class MainActivity: ComponentActivity() {
                     Text("تنظیمات",style=MaterialTheme.typography.headlineSmall)
                     if(settingsPage.isBlank()) {
                         listOf("دفتر نمرات","هوش مصنوعی","پشتیبان‌گیری").forEach { page ->
-                            Card(onClick={settingsPage=page},modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)){Text(page,fontWeight=FontWeight.Bold);Text(when(page){"دفتر نمرات"->"مدیریت ستون‌ها و مقیاس نمرات";"هوش مصنوعی"->"کلید API و تنظیمات تولید محتوا";else->"خروجی و نگهداری داده‌ها"})} }
+                            Card(onClick={settingsPage=page},modifier=Modifier.fillMaxWidth()) { Row(Modifier.fillMaxWidth().padding(18.dp),verticalAlignment=Alignment.CenterVertically){Text(page,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));Icon(Icons.Default.ChevronLeft,null)} }
                         }
                     } else {
                         TextButton(onClick={settingsPage=""}){Text("← بازگشت به تنظیمات")}
@@ -260,16 +274,22 @@ class MainActivity: ComponentActivity() {
                                 OutlinedTextField(newColumn,{newColumn=it},label={Text("نام ستون جدید")},modifier=Modifier.fillMaxWidth())
                                 Button(onClick={if(newColumn.isNotBlank()&&columns.none{it.name==newColumn.trim()}){columns=columns+ScoreColumn(newColumn.trim());newColumn="";persist()}},modifier=Modifier.fillMaxWidth()){Text("افزودن ستون")}
                             }
-                            "هوش مصنوعی" -> OutlinedTextField(apiKey,{apiKey=it;prefs.edit().putString("api_key",it).apply()},label={Text("کلید API Groq")},modifier=Modifier.fillMaxWidth())
+                            "هوش مصنوعی" -> {
+                                OutlinedTextField(value=apiKey,onValueChange={apiKey=it;securePrefs.edit().putString("api_key",it.trim()).apply();apiTestResult=""},label={Text("کلید API Groq")},modifier=Modifier.fillMaxWidth(),singleLine=true,visualTransformation=if(showApiKey)VisualTransformation.None else PasswordVisualTransformation(),trailingIcon={IconButton(onClick={showApiKey=!showApiKey}){Icon(if(showApiKey)Icons.Default.VisibilityOff else Icons.Default.Visibility,null)}})
+                                Row(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.fillMaxWidth()) {
+                                    Button(onClick={securePrefs.edit().putString("api_key",apiKey.trim()).apply();snackbar="کلید ذخیره شد."},modifier=Modifier.weight(1f)){Icon(Icons.Default.Save,null);Text("ذخیره کلید")}
+                                    OutlinedButton(onClick={
+                                        if(apiKey.isBlank()){apiTestResult="کلید را وارد کنید."}else{apiTestLoading=true;apiTestResult="";scope.launch{apiTestResult=testGroqConnection(apiKey);apiTestLoading=false}}
+                                    },modifier=Modifier.weight(1f),enabled=!apiTestLoading){Text(if(apiTestLoading)"در حال بررسی…" else "آزمایش اتصال")}
+                                }
+                                if(apiTestResult.isNotBlank()) Text(apiTestResult,color=if(apiTestResult.contains("موفق"))MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                            }
                             "پشتیبان‌گیری" -> {
                                 Button(onClick={exportLauncher.launch("YarMoallem_Backup_${java.time.LocalDate.now()}.json")},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Backup,"");Text("ذخیره فایل پشتیبان")}
                                 Button(onClick={importLauncher.launch(arrayOf("application/json","text/*"))},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Restore,"");Text("بازیابی از فایل پشتیبان")}
-                                Text("پشتیبان شامل دانش‌آموزان، تمام نمرات، ستون‌های نمره، حضور و غیاب و برنامه هفتگی است. هنگام بازیابی، اطلاعات فعلی با فایل انتخابی جایگزین می‌شود.")
-                                Text("پشتیبان خودکار داخلی نیز پس از تغییرات مهم ذخیره می‌شود.",style=MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
-                    Text("اطلاعات دانش‌آموزان روی همین دستگاه ذخیره می‌شود.")
                 }
             6 -> {
                 Text("حضور و غیاب",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
@@ -326,7 +346,6 @@ class MainActivity: ComponentActivity() {
             }
             7 -> {
                 Text("برنامه هفتگی",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-                Text("هر ردیف را به شکل روز | ساعت | کلاس | درس وارد کنید. جدول پیش‌نمایش خودکار ساخته می‌شود.")
                 OutlinedTextField(timetableEdit,{timetableEdit=it},modifier=Modifier.fillMaxWidth(),minLines=6,label={Text("شنبه | ۸ تا ۹ | نهم ۱ | مطالعات")})
                 val timetableRows=timetableEdit.lines().mapNotNull{line->val p=line.split("|").map{it.trim()};if(p.size>=4&&p[0].isNotBlank())p else null}
                 if(timetableRows.isNotEmpty()) {
@@ -360,7 +379,6 @@ class MainActivity: ComponentActivity() {
         Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer),shape=MaterialTheme.shapes.extraLarge) {
             Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Text("یار معلم",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.onPrimaryContainer)
-                Text("مدیریت کلاس و پیگیری یادگیری، یک‌جا",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onPrimaryContainer)
                 Button(onClick={onNavigate(1)},modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.PersonAdd,""); Text("افزودن دانش‌آموز یا کلاس") }
             }
         }
@@ -435,8 +453,7 @@ class MainActivity: ComponentActivity() {
             }
             Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
                 Text(title,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium)
-                Text(subtitle,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+                }
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) { Icon(Icons.Default.ArrowForward,null,tint=MaterialTheme.colorScheme.primary) }
         }
     }
@@ -516,7 +533,7 @@ fun jalaliDateLabel(iso:String):String {
 }
 fun normalizeDigits(s:String):String { val p="۰۱۲۳۴۵۶۷۸۹";val a="٠١٢٣٤٥٦٧٨٩";return s.map{ch->when{ch in p->(ch.code-p[0].code).toString();ch in a->(ch.code-a[0].code).toString();else->ch.toString()}}.joinToString("") }
 fun makeBackup(students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String,apiKey:String):String = JSONObject().put("app","YarMoallem").put("version",3).put("apiKey",apiKey).put("createdAt",java.time.Instant.now().toString()).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).put("attendance",JSONObject(attendance.toString())).put("timetable",timetable).toString(2)
-fun autoBackup(prefs:android.content.SharedPreferences,students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String){try{val json=makeBackup(students,columns,attendance,timetable,prefs.getString("api_key","") ?: "");val e=prefs.edit().putString("auto_backup_latest",json).putString("auto_backup_time",java.time.Instant.now().toString());for(i in 6 downTo 1){val old=prefs.getString("auto_backup_"+i,null);if(old!=null)e.putString("auto_backup_"+(i+1),old)};e.putString("auto_backup_1",json).apply()}catch(_:Exception){}}
+fun autoBackup(prefs:android.content.SharedPreferences,students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String,apiKey:String=""){try{val json=makeBackup(students,columns,attendance,timetable,apiKey);val e=prefs.edit().putString("auto_backup_latest",json).putString("auto_backup_time",java.time.Instant.now().toString());for(i in 6 downTo 1){val old=prefs.getString("auto_backup_"+i,null);if(old!=null)e.putString("auto_backup_"+(i+1),old)};e.putString("auto_backup_1",json).apply()}catch(_:Exception){}}
 fun average(scores:Map<String,Float>):Float?=scores.values.takeIf{it.isNotEmpty()}?.average()?.toFloat()
 fun parseVoice(text:String):Pair<String,Float>?{
     val nums=Regex("""\d+(?:[٫.]\d+)?""").findAll(text).mapNotNull{it.value.replace('٫','.').toFloatOrNull()}.toList()
@@ -530,7 +547,7 @@ suspend fun generateLessonWithGroq(apiKey:String,request:String,mode:String="les
         val conn=(java.net.URL("https://api.groq.com/openai/v1/chat/completions").openConnection() as java.net.HttpURLConnection)
         conn.requestMethod="POST";conn.connectTimeout=30000;conn.readTimeout=120000;conn.doOutput=true
         conn.setRequestProperty("Content-Type","application/json");conn.setRequestProperty("Authorization","Bearer ${apiKey.trim()}")
-        val task=if(mode=="quiz")"""بر اساس تنظیمات آزمون که در درخواست آمده، آزمون بساز. دقیقاً نوع سؤال‌های انتخاب‌شده و تعداد تعیین‌شده برای هر نوع را رعایت کن؛ هیچ سؤال اضافی یا نوع انتخاب‌نشده تولید نکن. درجه دشواری انتخاب‌شده را در همه سؤال‌ها رعایت کن. اگر پاسخنامه درخواست شده، آن را در بخش جداگانه با پاسخ صحیح، پاسخ تشریحی کوتاه و بارم هر سؤال ارائه کن؛ در غیر این صورت پاسخ‌ها را نمایش نده. خروجی مختصر، مرتب و بدون مقدمه طولانی باشد. مطالب تأییدنشده را به کتاب نسبت نده.""" else """فقط یک طرح درس کوتاه و اجرایی بنویس؛ حداکثر ۱۸۰ تا ۲۲۰ کلمه. فقط این بخش‌ها را با تیترهای کوتاه بیاور: هدف درس (یک جمله)، شروع و ارزشیابی آغازین (۲ دقیقه)، تدریس و فعالیت دانش‌آموز (با زمان‌بندی متناسب با یک زنگ)، ارزشیابی پایانی (یک روش مشخص)، تکلیف (یک مورد). از مقدمه، توضیح درباره روش جستجو، توصیه‌های عمومی، تکرار هدف‌ها، فهرست منابع طولانی و بخش‌های اضافی خودداری کن. مثال یا فعالیت باید دقیقاً با همان مبحث و پایه متناسب باشد؛ مثال یا صفحه ساختگی نساز."""
+        val task=if(mode=="test")"فقط عبارت «اتصال موفق است» را برگردان." else if(mode=="quiz")"""بر اساس تنظیمات آزمون که در درخواست آمده، آزمون بساز. دقیقاً نوع سؤال‌های انتخاب‌شده و تعداد تعیین‌شده برای هر نوع را رعایت کن؛ هیچ سؤال اضافی یا نوع انتخاب‌نشده تولید نکن. درجه دشواری انتخاب‌شده را در همه سؤال‌ها رعایت کن. اگر پاسخنامه درخواست شده، آن را در بخش جداگانه با پاسخ صحیح، پاسخ تشریحی کوتاه و بارم هر سؤال ارائه کن؛ در غیر این صورت پاسخ‌ها را نمایش نده. خروجی مختصر، مرتب و بدون مقدمه طولانی باشد. مطالب تأییدنشده را به کتاب نسبت نده.""" else """فقط یک طرح درس کوتاه و اجرایی بنویس؛ حداکثر ۱۸۰ تا ۲۲۰ کلمه. فقط این بخش‌ها را با تیترهای کوتاه بیاور: هدف درس (یک جمله)، شروع و ارزشیابی آغازین (۲ دقیقه)، تدریس و فعالیت دانش‌آموز (با زمان‌بندی متناسب با یک زنگ)، ارزشیابی پایانی (یک روش مشخص)، تکلیف (یک مورد). از مقدمه، توضیح درباره روش جستجو، توصیه‌های عمومی، تکرار هدف‌ها، فهرست منابع طولانی و بخش‌های اضافی خودداری کن. مثال یا فعالیت باید دقیقاً با همان مبحث و پایه متناسب باشد؛ مثال یا صفحه ساختگی نساز."""
         val prompt="""درخواست خام کاربر: $request
 ابتدا پایه تحصیلی، نام درس، فصل/درس و عنوان مبحث را استخراج کن. جستجو را با ترکیب دقیق همین مشخصات و عنوان مبحث انجام بده؛ ابتدا منبع رسمی کتاب‌های درسی آموزش‌وپرورش (chap.sch.ir) و سپس شبکه رشد را بررسی کن. نتیجه باید هم‌زمان با پایه و عنوان مبحث تطبیق داشته باشد؛ نتیجه مشابه از پایه یا درس دیگر را استفاده نکن. از جستجوی کلی موضوع بدون پایه و عنوان دقیق پرهیز کن.
 اگر پایه یا نام درس یا مبحث مشخص نیست و از متن قابل تشخیص نیست، فقط یک سؤال کوتاه برای تکمیل همان مورد بپرس و طرح درس نساز. اگر منبع معتبر و منطبق پیدا نشد، فقط یک جمله کوتاه اعلام کن که متن دقیق کتاب تأیید نشد و سپس طرح درس عمومیِ محدود به اطلاعات قطعی درخواست ارائه بده؛ هیچ صفحه، تمرین، مثال یا عنوانی را جعل نکن.
@@ -544,6 +561,14 @@ $task
         if(code !in 200..299){val err=try{JSONObject(raw).optJSONObject("error")?.optString("message").orEmpty()}catch(_:Exception){""};when(code){401->"کلید Groq معتبر نیست.";403->"دسترسی به جستجوی وب یا مدل مجاز نیست.";429->"محدودیت درخواست Groq؛ کمی بعد تلاش کنید.";else->"خطای Groq ($code): ${err.ifBlank{"درخواست ناموفق"}}"}}
         else JSONObject(raw).optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content").orEmpty().ifBlank{"پاسخ جستجو خالی بود؛ درخواست را دقیق‌تر کنید."}
     }catch(e:Exception){"جستجو ناموفق بود: ${e.message ?: "خطای نامشخص"}"}
+}
+suspend fun testGroqConnection(apiKey:String):String {
+    val result=generateLessonWithGroq(apiKey,"آزمایش اتصال","test")
+    return if(result.contains("اتصال موفق است"))"اتصال Groq موفق است." else result
+}
+fun createSecurePreferences(context:android.content.Context):android.content.SharedPreferences {
+    val masterKey=MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
+    return EncryptedSharedPreferences.create(context,"yar_moallem_secure",masterKey,EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM)
 }
 fun lessonTemplate(req:String)= """طرح درس کوتاه
 موضوع: $req
