@@ -101,11 +101,13 @@ class MainActivity: ComponentActivity() {
             val newAttendance=root.optJSONObject("attendance") ?: JSONObject()
             val newTimetable=root.optString("timetable","")
             students=newStudents;columns=newColumns;attendance=newAttendance;timetable=newTimetable;timetableEdit=newTimetable;apiKey=root.optString("apiKey",apiKey)
+            selectedClass=newStudents.firstOrNull()?.clazz ?: "";selectedSubject=newStudents.firstOrNull { it.clazz==selectedClass }?.subject ?: ""
+            restoreMessage="بازیابی کامل شد؛ ${newStudents.size} دانش‌آموز بازیابی شد."
             securePrefs.edit().putString("api_key",apiKey).apply()
             prefs.edit().putString("students",saveStudents(newStudents)).putString("columns",saveColumns(newColumns)).putString("attendance",newAttendance.toString()).putString("timetable",newTimetable).remove("api_key").apply()
             autoBackup(prefs,newStudents,newColumns,newAttendance,newTimetable,apiKey)
-            snackbar="بازیابی کامل شد؛ ${newStudents.size} دانش‌آموز بازیابی شد."
-        } catch(e:Exception){snackbar="بازیابی انجام نشد؛ اطلاعات قبلی حفظ شد. ${e.message}"}
+
+        } catch(e:Exception){restoreMessage="بازیابی انجام نشد؛ اطلاعات قبلی حفظ شد. ${e.message}"}
     }
     var lessonLoading by remember { mutableStateOf(false) }
     fun persist(studentData:List<Student> = students, columnData:List<ScoreColumn> = columns) { prefs.edit().putString("students",saveStudents(studentData)).putString("columns",saveColumns(columnData)).apply(); autoBackup(prefs,studentData,columnData,attendance,timetable,apiKey) }
@@ -294,12 +296,15 @@ class MainActivity: ComponentActivity() {
                             "پشتیبان‌گیری" -> {
                                 Button(onClick={exportLauncher.launch("YarMoallem_Backup_${java.time.LocalDate.now()}.json")},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Backup,"");Text("ذخیره فایل پشتیبان")}
                                 Button(onClick={importLauncher.launch(arrayOf("application/json","text/*"))},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Restore,"");Text("بازیابی از فایل پشتیبان")}
+                            
+                                if(restoreMessage.isNotBlank()) Text(restoreMessage,color=if(restoreMessage.startsWith("بازیابی کامل"))MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
                             }
                             "درباره برنامه" -> {
                                 Card(modifier=Modifier.fillMaxWidth()) {
                                     Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                                         Text("یار معلم",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary)
-                                        Text("هدف یار معلم، زمینه‌سازی برای آموزش بهتر، هدفمندتر و اثربخش‌تر است؛ ابزاری برای کمک به معلم تا زمان و اطلاعات آموزشی را بهتر مدیریت کند و فرصت بیشتری برای توجه به یادگیری دانش‌آموزان داشته باشد.")
+                                        Text("این برنامه توسط مهدی ساریخانی فرد طراحی شده است.")
+                                        Text("هدف این برنامه، زمینه‌سازی برای آموزش بهتر، هدفمندتر و اثربخش‌تر است؛ ابزاری برای کمک به معلم تا زمان و اطلاعات آموزشی را بهتر مدیریت کند و فرصت بیشتری برای توجه به یادگیری دانش‌آموزان داشته باشد.")
                                         Text("این برنامه با فراهم کردن امکاناتی مانند مدیریت کلاس و دانش‌آموزان، ثبت نمرات، تحلیل عملکرد، حضور و غیاب، برنامه هفتگی و دستیار هوشمند آموزشی، تلاش می‌کند فرایند برنامه‌ریزی، پیگیری و ارزیابی آموزش را ساده‌تر کند.")
                                         Text("فناوری و هوش مصنوعی در این برنامه نقش ابزار کمکی دارند و جایگزین دانش، تجربه و تصمیم حرفه‌ای معلم نیستند. هدف نهایی، پشتیبانی از معلم و فراهم کردن زمینه‌ای بهتر برای رشد و یادگیری هر دانش‌آموز.")
                                     }
