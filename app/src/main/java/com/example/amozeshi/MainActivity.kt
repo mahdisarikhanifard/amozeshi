@@ -55,11 +55,11 @@ class MainActivity: ComponentActivity() {
     var attendance by remember { mutableStateOf(JSONObject(prefs.getString("attendance","{}") ?: "{}")) }
     var timetable by remember { mutableStateOf(prefs.getString("timetable","") ?: "") }
     var timetableEdit by remember { mutableStateOf(timetable) }
-    var selectedClass by remember { mutableStateOf("نهم ۱") }
-    var selectedSubject by remember { mutableStateOf("مطالعات اجتماعی") }
+    var selectedClass by remember { mutableStateOf(students.firstOrNull()?.clazz ?: "") }
+    var selectedSubject by remember { mutableStateOf(students.firstOrNull { it.clazz == selectedClass }?.subject ?: "") }
     var nameInput by remember { mutableStateOf("") }
-    var classInput by remember { mutableStateOf("نهم ۱") }
-    var subjectInput by remember { mutableStateOf("مطالعات اجتماعی") }
+    var classInput by remember { mutableStateOf(students.firstOrNull()?.clazz ?: "") }
+    var subjectInput by remember { mutableStateOf(students.firstOrNull()?.subject ?: "") }
     var newColumn by remember { mutableStateOf("") }
     var lessonRequest by remember { mutableStateOf("") }
     var lessonOutput by remember { mutableStateOf("") }
@@ -71,6 +71,7 @@ class MainActivity: ComponentActivity() {
     var speechText by remember { mutableStateOf("") }
     var speechColumn by remember { mutableStateOf("") }
     var snackbar by remember { mutableStateOf("") }
+    var restoreMessage by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf(securePrefs.getString("api_key",null) ?: prefs.getString("api_key","") ?: "") }
     var showApiKey by remember { mutableStateOf(false) }
     var apiTestLoading by remember { mutableStateOf(false) }
@@ -407,7 +408,7 @@ class MainActivity: ComponentActivity() {
                 }){Text("ذخیره")}},
                 dismissButton={TextButton(onClick={editStudent=null}){Text("انصراف")}}
             )
-            if(snackbar.isNotBlank()) Text(snackbar,color=MaterialTheme.colorScheme.primary)
+
         }
     }
 }
