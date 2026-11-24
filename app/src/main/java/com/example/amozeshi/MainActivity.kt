@@ -555,7 +555,7 @@ class MainActivity: ComponentActivity() {
         Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer),shape=MaterialTheme.shapes.extraLarge) {
             Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Text("یار معلم",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.onPrimaryContainer)
-                Button(onClick={onNavigate(1)},modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.PersonAdd,""); Text("افزودن دانش‌آموز یا کلاس") }
+                Button(onClick={onNavigate(7)},modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.CalendarMonth,""); Text("برنامه هفتگی") }
             }
         }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
