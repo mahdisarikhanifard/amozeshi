@@ -216,7 +216,7 @@ class MainActivity: ComponentActivity() {
                     Text("میانگین هر ستون",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);columnAnalysis.forEach{(col,avg)->Card{Row(Modifier.fillMaxWidth().padding(12.dp),horizontalArrangement=Arrangement.SpaceBetween){Text(col.name);Text(avg?.let{"میانگین %.2f".format(it)}?: "بدون نمره",fontWeight=FontWeight.Bold)}}};if(bestStudents.isNotEmpty()){Text("۳ دانش‌آموز برتر",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);bestStudents.forEach{(st,avg)->Text("${st.name} — %.2f".format(avg))}};Text("توزیع میانگین",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
                     listOf("۱۸ تا ۲۰" to report.count{(average(it.scores)?:-1f)>=18},"۱۶ تا ۱۸" to report.count{val a=average(it.scores);a!=null&&a>=16&&a<18},"۱۴ تا ۱۶" to report.count{val a=average(it.scores);a!=null&&a>=14&&a<16},"۱۲ تا ۱۴" to report.count{val a=average(it.scores);a!=null&&a>=12&&a<14},"کمتر از ۱۲" to low,"بدون نمره" to missing).forEach{(label,count)->Row(verticalAlignment=Alignment.CenterVertically){Text(label,Modifier.weight(1f));LinearProgressIndicator(progress={if(report.isEmpty())0f else count.toFloat()/report.size},Modifier.weight(1f));Text(count.toString(),Modifier.width(32.dp))}}
                     Button(onClick={shareAnalysis(ctx,selectedClass,selectedSubject,report,columns)},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.FileDownload,"");Text("خروجی تحلیل در Word")}
-                    report.forEach{StudentAnalysisCard(it,columns)}
+                    report.forEach{StudentAnalysisCard(it,columns,report)}
                 }
                 4 -> {
                     Text("دستیار آموزشی",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
@@ -526,20 +526,36 @@ class MainActivity: ComponentActivity() {
         extraLarge=androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
     ),content=content)
 }
-@Composable fun StudentAnalysisCard(s:Student,columns:List<ScoreColumn>){
-    val vals=s.scores.values
+@Composable fun StudentAnalysisCard(s:Student,columns:List<ScoreColumn>,classmates:List<Student> = emptyList()){
     val avg=average(s.scores)
+    val peerAverages=classmates.filter{it!=s}.mapNotNull{average(it.scores)}
+    val peerAvg=if(peerAverages.isEmpty())null else peerAverages.average().toFloat()
+    val completed=columns.count{it.name in s.scores}
     val missing=columns.filter{it.name !in s.scores}.map{it.name}
-    val low=s.scores.filterValues{it<12}.keys
-    val highest=s.scores.maxByOrNull{it.value}
-    Card { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
-        Text(s.name,fontWeight=FontWeight.Bold);Text("${s.clazz} · ${s.subject}")
-        Text("میانگین ثبت‌شده: ${avg?.let{"%.2f".format(it)} ?: "بدون نمره"}")
-        Text("تعداد نمرات: ${vals.count()}")
-        Text("بالاترین نمره: ${highest?.let{"${it.key}: ${it.value}"} ?: "—"}")
-        Text("نیاز به توجه: ${if(low.isEmpty())"موردی بر اساس آستانه ۱۲ شناسایی نشد" else low.joinToString()}")
-        Text("نمرات ثبت‌نشده: ${if(missing.isEmpty())"ندارد" else missing.joinToString()}")
-        if(avg!=null) Text(when{avg>=17->"عملکرد بسیار خوب؛ پیشنهاد: فعالیت‌های چالشی و تعمیقی.";avg>=14->"عملکرد خوب؛ مرور هدفمند نکات دشوار.";avg>=12->"عملکرد متوسط؛ تمرین تکمیلی توصیه می‌شود.";else->"نیازمند برنامه حمایتی، بررسی نقاط ضعف و پیگیری فردی."})
+    val ranked=s.scores.entries.sortedBy{it.value}
+    val weakest=ranked.firstOrNull()
+    val strongest=ranked.lastOrNull()
+    val lowCount=s.scores.count{it.value<12f}
+    val delta=if(avg!=null&&peerAvg!=null)avg-peerAvg else null
+    val completion=if(columns.isEmpty())100 else completed*100/columns.size
+    val recommendation=when {
+        avg==null -> "هنوز نمره‌ای ثبت نشده؛ ابتدا ارزیابی‌های این دانش‌آموز را تکمیل کنید."
+        completion<50 -> "اطلاعات ارزیابی ناقص است؛ پیش از قضاوت، ستون‌های باقی‌مانده را تکمیل کنید."
+        avg<12f -> "نیازمند حمایت آموزشی؛ مبحث‌های ضعیف را به بخش‌های کوچک تقسیم و با تمرین مرحله‌ای و بازخورد پیگیری کنید."
+        lowCount>0 -> "در ستون‌های ضعیف‌تر تمرین هدفمند ارائه کنید و در ارزیابی بعدی میزان پیشرفت را بسنجید."
+        avg>=17f -> "عملکرد قوی؛ از فعالیت‌های تعمیقی و مسئله‌های چالشی برای توسعه یادگیری استفاده کنید."
+        else -> "یادگیری در سطح قابل قبول است؛ مرور منظم و تمرین متنوع به تثبیت آموخته‌ها کمک می‌کند."
+    }
+    Card { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
+        Text(s.name,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium)
+        Text("${s.clazz} · ${s.subject}",color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("میانگین نمرات ثبت‌شده: ${avg?.let{"%.2f از ۲۰".format(it)} ?: "بدون نمره"}",fontWeight=FontWeight.SemiBold)
+        Text("تکمیل ارزیابی: $completed از ${columns.size} ستون ($completion٪)")
+        if(delta!=null) Text(if(delta>=0) "بالاتر از میانگین هم‌کلاسی‌ها به میزان %.2f".format(delta) else "پایین‌تر از میانگین هم‌کلاسی‌ها به میزان %.2f".format(-delta))
+        if(strongest!=null) Text("نقطه قوت: ${strongest.key} (${"%.2f".format(strongest.value)})")
+        if(weakest!=null&&weakest.key!=strongest?.key) Text("نیازمند تقویت: ${weakest.key} (${"%.2f".format(weakest.value)})")
+        if(missing.isNotEmpty()) Text("ارزیابی‌های ثبت‌نشده: ${missing.joinToString("، ")}")
+        Text("پیشنهاد آموزشی: $recommendation",color=MaterialTheme.colorScheme.primary)
     } }
 }
 fun jalaliToIso(yearText:String,monthText:String,dayText:String):String? {
