@@ -783,8 +783,10 @@ fun jalaliDateLabel(iso:String):String {
     } catch(_:Exception) { iso }
 }
 fun normalizeDigits(s:String):String { val p="۰۱۲۳۴۵۶۷۸۹";val a="٠١٢٣٤٥٦٧٨٩";return s.map{ch->when{ch in p->(ch.code-p[0].code).toString();ch in a->(ch.code-a[0].code).toString();else->ch.toString()}}.joinToString("") }
-fun makeBackup(students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String,apiKey:String):String = JSONObject().put("app","YarMoallem").put("version",3).put("apiKey",apiKey).put("createdAt",java.time.Instant.now().toString()).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).put("attendance",JSONObject(attendance.toString())).put("timetable",timetable).toString(2)
-fun autoBackup(prefs:android.content.SharedPreferences,students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String,apiKey:String=""){try{val json=makeBackup(students,columns,attendance,timetable,"");val e=prefs.edit().putString("auto_backup_latest",json).putString("auto_backup_time",java.time.Instant.now().toString());for(i in 6 downTo 1){val old=prefs.getString("auto_backup_"+i,null);if(old!=null)e.putString("auto_backup_"+(i+1),old)};e.putString("auto_backup_1",json).apply()}catch(_:Exception){}}
+fun normalizeScoreInput(value:String):String = normalizeDigits(value).replace("٫",".").replace("٬","").replace("،",".").replace(",",".").filter{it.isDigit()||it=='.'}
+fun bidiLtr(value:String):String = "\u2066"+value+"\u2069"
+fun makeBackup(students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String):String = JSONObject().put("app","YarMoallem").put("version",4).put("createdAt",java.time.Instant.now().toString()).put("students",JSONArray(saveStudents(students))).put("columns",JSONArray(saveColumns(columns))).put("attendance",JSONObject(attendance.toString())).put("timetable",timetable).toString(2)
+fun autoBackup(prefs:android.content.SharedPreferences,students:List<Student>,columns:List<ScoreColumn>,attendance:JSONObject,timetable:String,apiKey:String=""){try{val json=makeBackup(students,columns,attendance,timetable);val e=prefs.edit().putString("auto_backup_latest",json).putString("auto_backup_time",java.time.Instant.now().toString());for(i in 6 downTo 1){val old=prefs.getString("auto_backup_"+i,null);if(old!=null)e.putString("auto_backup_"+(i+1),old)};e.putString("auto_backup_1",json);if(!e.commit())throw IllegalStateException("auto backup commit failed")}catch(_:Exception){}}
 fun average(scores:Map<String,Float>):Float?=scores.values.takeIf{it.isNotEmpty()}?.average()?.toFloat()
 fun parseVoice(text:String):Pair<String,Float>?{
     val nums=Regex("""\d+(?:[٫.]\d+)?""").findAll(text).mapNotNull{it.value.replace('٫','.').toFloatOrNull()}.toList()
@@ -838,6 +840,48 @@ fun lessonTemplate(req:String)= """طرح درس کوتاه
 • ارزشیابی (۵ دقیقه): یک پرسش کاربردی برای سنجش یادگیری
 • تکلیف: پاسخ به یک تمرین مرتبط از کتاب درسی
 """.trimIndent()
+fun parseBackup(raw:String):BackupSnapshot {
+    require(raw.isNotBlank()&&raw.length<=10_000_000) {"حجم یا محتوای فایل پشتیبان معتبر نیست"}
+    val root=JSONObject(raw)
+    require(root.optString("app")=="YarMoallem") {"این فایل، پشتیبان یار معلم نیست"}
+    val version=root.optInt("version",-1)
+    require(version in 1..4) {"نسخه فایل پشتیبان پشتیبانی نمی‌شود"}
+    val studentArray=root.optJSONArray("students") ?: throw IllegalArgumentException("فهرست دانش‌آموزان وجود ندارد")
+    val identities=mutableSetOf<String>()
+    val parsedStudents=(0 until studentArray.length()).map{index->
+        val item=studentArray.getJSONObject(index)
+        val name=item.optString("name").trim()
+        val clazz=item.optString("clazz").trim()
+        val subject=item.optString("subject").trim()
+        require(name.isNotBlank()&&clazz.isNotBlank()&&subject.isNotBlank()) {"مشخصات یکی از دانش‌آموزان ناقص است"}
+        val number=item.optString("studentNumber").ifBlank{"قدیمی-"+Integer.toUnsignedString((clazz+"|"+name).hashCode())}
+        require(identities.add(number+"|"+clazz+"|"+subject)) {"دانش‌آموز تکراری در فایل پشتیبان وجود دارد"}
+        val scoreObject=item.optJSONObject("scores") ?: throw IllegalArgumentException("ساختار نمرات یکی از دانش‌آموزان معتبر نیست")
+        val scores=mutableMapOf<String,Float>()
+        val keys=scoreObject.keys()
+        while(keys.hasNext()) {
+            val key=keys.next()
+            val score=scoreObject.getDouble(key)
+            require(key.isNotBlank()&&score.isFinite()&&score in 0.0..100.0) {"یکی از نمرات خارج از محدوده معتبر است"}
+            scores[key]=score.toFloat()
+        }
+        Student(name,clazz,subject,scores,number)
+    }
+    val columnArray=root.optJSONArray("columns") ?: throw IllegalArgumentException("فهرست ستون‌های نمره وجود ندارد")
+    val parsedColumns=(0 until columnArray.length()).map{index->
+        val name=columnArray.getString(index).trim()
+        require(name.isNotBlank()) {"نام یکی از ستون‌های نمره خالی است"}
+        ScoreColumn(name)
+    }
+    require(parsedColumns.map{it.name}.distinct().size==parsedColumns.size) {"نام ستون‌های نمره تکراری است"}
+    val attendance=root.optJSONObject("attendance") ?: JSONObject()
+    val timetable=if(root.has("timetable")) {
+        val value=root.get("timetable")
+        require(value is String) {"ساختار برنامه هفتگی معتبر نیست"}
+        value as String
+    } else ""
+    return BackupSnapshot(parsedStudents,parsedColumns,JSONObject(attendance.toString()),timetable)
+}
 fun loadStudents(raw:String):List<Student> = try { val a=JSONArray(raw);(0 until a.length()).map{val o=a.getJSONObject(it);val name=o.getString("name");val clazz=o.getString("clazz");val sc=o.getJSONObject("scores");val m=mutableMapOf<String,Float>();sc.keys().forEach{m[it]=sc.getDouble(it).toFloat()};val legacyNumber="قدیمی-"+Integer.toUnsignedString((clazz+"|"+name).hashCode());Student(name,clazz,o.getString("subject"),m,o.optString("studentNumber").ifBlank{legacyNumber})} }catch(_:Exception){emptyList()}
 fun saveStudents(list:List<Student>):String {val a=JSONArray();list.forEach{s->val scores=JSONObject();s.scores.forEach{(k,v)->scores.put(k,v)};a.put(JSONObject().put("name",s.name).put("studentNumber",s.studentNumber).put("clazz",s.clazz).put("subject",s.subject).put("scores",scores))};return a.toString()}
 fun loadColumns(raw:String):List<ScoreColumn> = try {val a=JSONArray(raw);(0 until a.length()).map{ScoreColumn(a.getString(it))}}catch(_:Exception){listOf(ScoreColumn("مستمر"),ScoreColumn("شفاهی"),ScoreColumn("آزمون"))}
