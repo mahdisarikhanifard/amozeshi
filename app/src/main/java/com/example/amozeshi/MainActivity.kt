@@ -514,7 +514,6 @@ class MainActivity: ComponentActivity() {
                                 prefs.edit().putString("attendance",updatedAttendance.toString()).apply()
                                 persist(updatedStudents)
                                 autoBackup(prefs,updatedStudents,columns,updatedAttendance,timetable,apiKey)
-                                if(selectedClass==classEditSource&&selected.any{it==students.firstOrNull{st->st.clazz==target&&st.studentNumber==it}?.studentNumber}) selectedClass=target
                                 snackbar="${selected.size} دانش‌آموز به «$target» منتقل شدند."
                                 showClassEditor=false
                             }
