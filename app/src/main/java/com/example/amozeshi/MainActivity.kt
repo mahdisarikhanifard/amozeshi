@@ -268,7 +268,7 @@ class MainActivity: ComponentActivity() {
                 5 -> {
                     Text("تنظیمات",style=MaterialTheme.typography.headlineSmall)
                     if(settingsPage.isBlank()) {
-                        listOf("دفتر نمرات","هوش مصنوعی","پشتیبان‌گیری").forEach { page ->
+                        listOf("دفتر نمرات","هوش مصنوعی","پشتیبان‌گیری","درباره برنامه").forEach { page ->
                             Card(onClick={settingsPage=page},modifier=Modifier.fillMaxWidth()) { Row(Modifier.fillMaxWidth().padding(18.dp),verticalAlignment=Alignment.CenterVertically){Text(page,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));Icon(Icons.Default.ChevronLeft,null)} }
                         }
                     } else {
@@ -293,6 +293,16 @@ class MainActivity: ComponentActivity() {
                             "پشتیبان‌گیری" -> {
                                 Button(onClick={exportLauncher.launch("YarMoallem_Backup_${java.time.LocalDate.now()}.json")},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Backup,"");Text("ذخیره فایل پشتیبان")}
                                 Button(onClick={importLauncher.launch(arrayOf("application/json","text/*"))},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Restore,"");Text("بازیابی از فایل پشتیبان")}
+                            }
+                            "درباره برنامه" -> {
+                                Card(modifier=Modifier.fillMaxWidth()) {
+                                    Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                                        Text("یار معلم",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary)
+                                        Text("هدف یار معلم، زمینه‌سازی برای آموزش بهتر، هدفمندتر و اثربخش‌تر است؛ ابزاری برای کمک به معلم تا زمان و اطلاعات آموزشی را بهتر مدیریت کند و فرصت بیشتری برای توجه به یادگیری دانش‌آموزان داشته باشد.")
+                                        Text("این برنامه با فراهم کردن امکاناتی مانند مدیریت کلاس و دانش‌آموزان، ثبت نمرات، تحلیل عملکرد، حضور و غیاب، برنامه هفتگی و دستیار هوشمند آموزشی، تلاش می‌کند فرایند برنامه‌ریزی، پیگیری و ارزیابی آموزش را ساده‌تر کند.")
+                                        Text("فناوری و هوش مصنوعی در این برنامه نقش ابزار کمکی دارند و جایگزین دانش، تجربه و تصمیم حرفه‌ای معلم نیستند. هدف نهایی، پشتیبانی از معلم و فراهم کردن زمینه‌ای بهتر برای رشد و یادگیری هر دانش‌آموز.")
+                                    }
+                                }
                             }
                         }
                     }
