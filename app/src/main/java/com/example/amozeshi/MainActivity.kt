@@ -140,7 +140,7 @@ class MainActivity: ComponentActivity() {
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             when(selectedTab) {
-                0 -> HomeScreen(students,columns,onNavigate={selectedTab=it},selectedClass,selectedSubject,onSelectClass={selectedClass=it;selectedSubject=students.filter{st->st.clazz==it}.map{st->st.subject}.distinct().firstOrNull() ?: selectedSubject})
+                0 -> HomeScreen(students,columns,timetable,onNavigate={selectedTab=it},selectedClass,selectedSubject,onSelectClass={selectedClass=it;selectedSubject=students.filter{st->st.clazz==it}.map{st->st.subject}.distinct().firstOrNull() ?: selectedSubject})
                 1 -> {
                     Text("مدیریت کلاس‌ها", style=MaterialTheme.typography.headlineSmall, fontWeight=FontWeight.Bold)
                     OutlinedTextField(nameInput, { nameInput=it }, label={Text("نام دانش‌آموز")}, modifier=Modifier.fillMaxWidth())
@@ -548,14 +548,41 @@ class MainActivity: ComponentActivity() {
     }
 }
 
-@Composable fun HomeScreen(students:List<Student>,columns:List<ScoreColumn>,onNavigate:(Int)->Unit,clazz:String,subject:String,onSelectClass:(String)->Unit){
+@Composable fun HomeScreen(students:List<Student>,columns:List<ScoreColumn>,timetable:String,onNavigate:(Int)->Unit,clazz:String,subject:String,onSelectClass:(String)->Unit){
     val classes=students.groupBy{it.clazz}.toSortedMap()
     val scored=students.count{it.scores.isNotEmpty()}
     Column(verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer),shape=MaterialTheme.shapes.extraLarge) {
-            Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                Text("یار معلم",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.onPrimaryContainer)
-                Button(onClick={onNavigate(7)},modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.CalendarMonth,""); Text("برنامه هفتگی") }
+        Card(shape=MaterialTheme.shapes.extraLarge) {
+            Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween,modifier=Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.CalendarMonth,null,tint=MaterialTheme.colorScheme.primary)
+                        Text("برنامه هفتگی",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+                    }
+                    TextButton(onClick={onNavigate(7)}) { Text("ویرایش") }
+                }
+                val weekRows=timetable.lines().mapNotNull{line->val cells=line.split("|").map{it.trim()};if(cells.size>=4&&cells[0].isNotBlank())cells.take(4) else null}
+                if(weekRows.isEmpty()) {
+                    Text("هنوز برنامه‌ای ثبت نشده است.",color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick={onNavigate(7)},modifier=Modifier.fillMaxWidth()) { Text("ثبت برنامه هفتگی") }
+                } else {
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(3.dp)) {
+                        listOf("روز","ساعت","کلاس","درس").forEach { heading ->
+                            Surface(Modifier.weight(1f),color=MaterialTheme.colorScheme.primaryContainer,shape=MaterialTheme.shapes.small) {
+                                Text(heading,Modifier.padding(vertical=8.dp,horizontal=3.dp),fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelSmall,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+                            }
+                        }
+                    }
+                    weekRows.forEach { cells ->
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(3.dp),verticalAlignment=Alignment.CenterVertically) {
+                            cells.forEach { cell ->
+                                Surface(Modifier.weight(1f),color=MaterialTheme.colorScheme.surfaceVariant,shape=MaterialTheme.shapes.small) {
+                                    Text(cell,Modifier.padding(vertical=9.dp,horizontal=3.dp),style=MaterialTheme.typography.bodySmall,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
