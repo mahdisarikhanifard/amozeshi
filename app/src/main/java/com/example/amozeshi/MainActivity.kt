@@ -76,6 +76,9 @@ class MainActivity: ComponentActivity() {
     var apiTestLoading by remember { mutableStateOf(false) }
     var apiTestResult by remember { mutableStateOf("") }
     var editStudent by remember { mutableStateOf<Student?>(null) }
+    var editName by remember { mutableStateOf("") }
+    var editClazz by remember { mutableStateOf("") }
+    var editSubject by remember { mutableStateOf("") }
     val scope=rememberCoroutineScope()
     LaunchedEffect(Unit) {
         if (securePrefs.getString("api_key",null)==null) {
@@ -160,6 +163,7 @@ class MainActivity: ComponentActivity() {
                                             Text(st.name,fontWeight=FontWeight.SemiBold)
                                             Text("میانگین: "+(average(st.scores)?.let{"%.2f".format(it)}?: "—"))
                                         }
+                                        IconButton(onClick={editStudent=st;editName=st.name;editClazz=st.clazz;editSubject=st.subject}){Icon(Icons.Default.Edit,"ویرایش")}
                                         IconButton(onClick={students=students.filterNot{it==st};persist()}){Icon(Icons.Default.Delete,"حذف")}
                                     }
                                 }
@@ -211,7 +215,7 @@ class MainActivity: ComponentActivity() {
                 }
                 4 -> {
                     Text("دستیار آموزشی",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-                    Text("طرح درس کوتاه و دقیق بر اساس کتاب درسی",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    
                     OutlinedTextField(lessonRequest,{lessonRequest=it},label={Text("پایه، درس و عنوان دقیق مبحث")},placeholder={Text("مثلاً پایه هفتم، علوم، فصل ۳، اتم‌ها")},modifier=Modifier.fillMaxWidth(),minLines=2)
                     if(quizConfigOpen) {
                     Text("تنظیمات آزمون",fontWeight=FontWeight.Bold)
@@ -367,6 +371,24 @@ class MainActivity: ComponentActivity() {
                 }
             }
             }
+            if(editStudent!=null) AlertDialog(
+                onDismissRequest={editStudent=null},
+                title={Text("ویرایش دانش‌آموز")},
+                text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+                    OutlinedTextField(editName,{editName=it},label={Text("نام دانش‌آموز")},singleLine=true)
+                    OutlinedTextField(editClazz,{editClazz=it},label={Text("کلاس / پایه")},singleLine=true)
+                    OutlinedTextField(editSubject,{editSubject=it},label={Text("درس")},singleLine=true)
+                }},
+                confirmButton={TextButton(onClick={
+                    val old=editStudent
+                    if(old!=null&&editName.isNotBlank()&&editClazz.isNotBlank()&&editSubject.isNotBlank()){
+                        students=students.map{if(it==old)old.copy(name=editName.trim(),clazz=editClazz.trim(),subject=editSubject.trim())else it}
+                        persist()
+                    }
+                    editStudent=null
+                }){Text("ذخیره")}},
+                dismissButton={TextButton(onClick={editStudent=null}){Text("انصراف")}}
+            )
             if(snackbar.isNotBlank()) Text(snackbar,color=MaterialTheme.colorScheme.primary)
         }
     }
@@ -403,7 +425,7 @@ class MainActivity: ComponentActivity() {
         if(classes.isEmpty()) {
             Card { Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Text("هنوز کلاسی ثبت نشده است.")
-                Text("برای شروع، کلاس و دانش‌آموزان را اضافه کنید.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                
                 Button(onClick={onNavigate(1)}){Text("ایجاد اولین کلاس")}
             } }
         } else classes.forEach{(className,roster)->
