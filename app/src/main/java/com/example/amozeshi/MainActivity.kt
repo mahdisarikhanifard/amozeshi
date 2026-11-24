@@ -597,8 +597,16 @@ suspend fun testGroqConnection(apiKey:String):String {
     return if(result.contains("اتصال موفق است"))"اتصال Groq موفق است." else result
 }
 fun createSecurePreferences(context:android.content.Context):android.content.SharedPreferences {
-    val masterKey=MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
-    return EncryptedSharedPreferences.create(context,"yar_moallem_secure",masterKey,EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM)
+    fun open():android.content.SharedPreferences {
+        val masterKey=MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
+        return EncryptedSharedPreferences.create(context,"yar_moallem_secure",masterKey,EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM)
+    }
+    return try {
+        open().also { it.all }
+    } catch (_:Exception) {
+        context.deleteSharedPreferences("yar_moallem_secure")
+        open()
+    }
 }
 fun lessonTemplate(req:String)= """طرح درس کوتاه
 موضوع: $req
