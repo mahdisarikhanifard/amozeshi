@@ -462,7 +462,7 @@ class MainActivity: ComponentActivity() {
                             Text("کلاس مبدأ")
                             var sourceMenu by remember { mutableStateOf(false) }
                             ExposedDropdownMenuBox(expanded=sourceMenu,onExpandedChange={sourceMenu=it}) {
-                                OutlinedTextField(classEditSource,{},{readOnly=true,label={Text("انتخاب کلاس")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(sourceMenu)},modifier=Modifier.fillMaxWidth().menuAnchor()})
+                                OutlinedTextField(value=classEditSource,onValueChange={},readOnly=true,label={Text("انتخاب کلاس")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(sourceMenu)},modifier=Modifier.fillMaxWidth().menuAnchor())
                                 ExposedDropdownMenu(expanded=sourceMenu,onDismissRequest={sourceMenu=false}) {
                                     students.map{it.clazz}.distinct().sorted().forEach{item->DropdownMenuItem(text={Text(item)},onClick={classEditSource=item;classEditSelectedNumbers=emptySet();sourceMenu=false})}
                                 }
