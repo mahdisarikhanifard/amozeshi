@@ -322,7 +322,7 @@ class MainActivity: ComponentActivity() {
                 Text("سوابق ماه انتخاب‌شده",fontWeight=FontWeight.Bold)
                 val monthRecords=attendance.keys().asSequence().filter{it.startsWith(attendanceDate.take(7))}.sorted().toList()
                 if(monthRecords.isEmpty()) Text("در این ماه سابقه‌ای ثبت نشده است.") else monthRecords.forEach{dateKey->val rec=attendance.optJSONObject(dateKey)?:JSONObject();Card{Column(Modifier.padding(10.dp)){Text(jalaliDateLabel(dateKey),fontWeight=FontWeight.Bold);Text("حاضر: "+rec.keys().asSequence().count{rec.optString(it)=="present"}+" · غایب: "+rec.keys().asSequence().count{rec.optString(it)=="absent"})}}}
-                roster.forEach{st->Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically){Text(st.name,Modifier.weight(1f));FilterChip(selected=day.optString(st.name)=="present",onClick={day.put(st.name,"present");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply();autoBackup(prefs,students,columns,attendance,timetable)},label={Text("حاضر")});Spacer(Modifier.width(6.dp));FilterChip(selected=day.optString(st.name)=="absent",onClick={day.put(st.name,"absent");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply()},label={Text("غایب")})}}
+                roster.forEach{st->Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically){Text(st.name,Modifier.weight(1f));FilterChip(selected=day.optString(st.name)=="present",onClick={day.put(st.name,"present");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply();autoBackup(prefs,students,columns,attendance,timetable,apiKey)},label={Text("حاضر")});Spacer(Modifier.width(6.dp));FilterChip(selected=day.optString(st.name)=="absent",onClick={day.put(st.name,"absent");attendance.put(attendanceDate,day);prefs.edit().putString("attendance",attendance.toString()).apply()},label={Text("غایب")})}}
                 Button(
                     onClick = {
                         val report = roster.joinToString("\n") { st ->
@@ -352,7 +352,7 @@ class MainActivity: ComponentActivity() {
                     Text("پیش‌نمایش جدول",fontWeight=FontWeight.Bold)
                     timetableRows.forEach { row -> Card { Row(Modifier.fillMaxWidth().padding(8.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){row.take(4).forEach{Text(it,Modifier.weight(1f),style=MaterialTheme.typography.bodySmall)}} } }
                 }
-                Button(onClick={timetable=timetableEdit;prefs.edit().putString("timetable",timetable).apply();autoBackup(prefs,students,columns,attendance,timetable);snackbar="برنامه هفتگی ذخیره شد."},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Save,"");Text("ذخیره برنامه")}
+                Button(onClick={timetable=timetableEdit;prefs.edit().putString("timetable",timetable).apply();autoBackup(prefs,students,columns,attendance,timetable,apiKey);snackbar="برنامه هفتگی ذخیره شد."},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Save,"");Text("ذخیره برنامه")}
                 OutlinedButton(
                     onClick = {
                         val sendIntent = Intent(Intent.ACTION_SEND).apply {
@@ -553,7 +553,7 @@ suspend fun generateLessonWithGroq(apiKey:String,request:String,mode:String="les
 اگر پایه یا نام درس یا مبحث مشخص نیست و از متن قابل تشخیص نیست، فقط یک سؤال کوتاه برای تکمیل همان مورد بپرس و طرح درس نساز. اگر منبع معتبر و منطبق پیدا نشد، فقط یک جمله کوتاه اعلام کن که متن دقیق کتاب تأیید نشد و سپس طرح درس عمومیِ محدود به اطلاعات قطعی درخواست ارائه بده؛ هیچ صفحه، تمرین، مثال یا عنوانی را جعل نکن.
 $task
 فقط خروجی خواسته‌شده را به فارسی بده. از مقدمه، جمع‌بندی، توضیح درباره هوش مصنوعی یا جستجو، منابع مفصل و توصیه‌های اضافه خودداری کن. اگر منبع دقیق پیدا شد، حداکثر یک ارجاع کوتاه در انتهای خروجی بیاور."""
-        val body=JSONObject().put("model","openai/gpt-oss-120b")
+        val body=JSONObject().put("model","groq/compound")
             .put("messages",JSONArray().put(JSONObject().put("role","system").put("content","دستیار پژوهش آموزشی و طراحی درس؛ جستجوی وب را انجام بده و از جعل منابع پرهیز کن.")).put(JSONObject().put("role","user").put("content",prompt)))
             .put("temperature",0.2).put("max_completion_tokens",2200)
         conn.outputStream.use{it.write(body.toString().toByteArray(Charsets.UTF_8))}
