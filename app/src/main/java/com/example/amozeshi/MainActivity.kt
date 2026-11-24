@@ -82,6 +82,10 @@ class MainActivity: ComponentActivity() {
     var editStudentNumber by remember { mutableStateOf("") }
     var editClazz by remember { mutableStateOf("") }
     var editSubject by remember { mutableStateOf("") }
+    var showClassEditor by remember { mutableStateOf(false) }
+    var classEditSource by remember { mutableStateOf("") }
+    var classEditTarget by remember { mutableStateOf("") }
+    var classEditSelectedNumbers by remember { mutableStateOf(setOf<String>()) }
     val scope=rememberCoroutineScope()
     LaunchedEffect(Unit) {
         if (securePrefs.getString("api_key",null)==null) {
@@ -158,6 +162,7 @@ class MainActivity: ComponentActivity() {
                         } else snackbar="نام، شماره دانش‌آموزی، کلاس و درس را کامل کنید."
                     }, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.PersonAdd,""); Text("ثبت دانش‌آموز") }
                     Text("کلاس‌ها و درس‌ها", style=MaterialTheme.typography.titleLarge, fontWeight=FontWeight.Bold)
+                    OutlinedButton(onClick={classEditSource=students.firstOrNull()?.clazz.orEmpty();classEditTarget="";classEditSelectedNumbers=emptySet();showClassEditor=true},modifier=Modifier.fillMaxWidth(),enabled=students.isNotEmpty()) { Icon(Icons.Default.Edit,"");Text("ویرایش و تفکیک کلاس‌ها") }
                     students.groupBy{it.clazz to it.subject}.forEach{(group,list)->
                         Card(modifier=Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(16.dp), verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -447,6 +452,77 @@ class MainActivity: ComponentActivity() {
             }
             }
             if(snackbar.isNotBlank()) Text(snackbar,color=MaterialTheme.colorScheme.primary)
+            if(showClassEditor) {
+                val sourceRoster=students.filter{it.clazz==classEditSource}.distinctBy{it.studentNumber}.sortedBy{it.name}
+                AlertDialog(
+                    onDismissRequest={showClassEditor=false},
+                    title={Text("ویرایش و تفکیک کلاس")},
+                    text={
+                        Column(Modifier.heightIn(max=480.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                            Text("کلاس مبدأ")
+                            var sourceMenu by remember { mutableStateOf(false) }
+                            ExposedDropdownMenuBox(expanded=sourceMenu,onExpandedChange={sourceMenu=it}) {
+                                OutlinedTextField(classEditSource,{},{readOnly=true,label={Text("انتخاب کلاس")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(sourceMenu)},modifier=Modifier.fillMaxWidth().menuAnchor()})
+                                ExposedDropdownMenu(expanded=sourceMenu,onDismissRequest={sourceMenu=false}) {
+                                    students.map{it.clazz}.distinct().sorted().forEach{item->DropdownMenuItem(text={Text(item)},onClick={classEditSource=item;classEditSelectedNumbers=emptySet();sourceMenu=false})}
+                                }
+                            }
+                            OutlinedTextField(classEditTarget,{classEditTarget=it},label={Text("نام جدید کلاس (مثلاً دهم الف)")},singleLine=true,modifier=Modifier.fillMaxWidth())
+                            Text("دانش‌آموزانی را که باید به کلاس جدید منتقل شوند انتخاب کنید:",style=MaterialTheme.typography.bodyMedium)
+                            sourceRoster.forEach{st->
+                                Row(verticalAlignment=Alignment.CenterVertically) {
+                                    Checkbox(checked=st.studentNumber in classEditSelectedNumbers,onCheckedChange={checked->classEditSelectedNumbers=if(checked)classEditSelectedNumbers+st.studentNumber else classEditSelectedNumbers-st.studentNumber})
+                                    Column(Modifier.weight(1f)) {
+                                        Text(st.name,fontWeight=FontWeight.SemiBold)
+                                        Text("شماره: ${st.studentNumber}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                            Text("${classEditSelectedNumbers.size} دانش‌آموز انتخاب شده",color=MaterialTheme.colorScheme.primary)
+                        }
+                    },
+                    confirmButton={
+                        TextButton(onClick={
+                            val target=classEditTarget.trim()
+                            val selected=classEditSelectedNumbers
+                            if(target.isBlank()||selected.isEmpty()) snackbar="نام کلاس جدید و حداقل یک دانش‌آموز را انتخاب کنید."
+                            else if(target==classEditSource) snackbar="نام کلاس جدید با کلاس مبدأ یکسان است."
+                            else {
+                                val movedRows=students.filter{it.clazz==classEditSource&&it.studentNumber in selected}
+                                val subjectsToMove=movedRows.map{it.subject}.distinct()
+                                val updatedStudents=students.map{st->if(st.clazz==classEditSource&&st.studentNumber in selected)st.copy(clazz=target)else st}
+                                val updatedAttendance=JSONObject(attendance.toString())
+                                val dates=updatedAttendance.keys().asSequence().toList()
+                                dates.forEach{dateKey->
+                                    val date=updatedAttendance.optJSONObject(dateKey)?:JSONObject()
+                                    subjectsToMove.forEach{lessonSubject->
+                                        val oldKey=classEditSource+"::"+lessonSubject
+                                        val newKey=target+"::"+lessonSubject
+                                        val oldRecord=date.optJSONObject(oldKey)
+                                        if(oldRecord!=null) {
+                                            val remaining=JSONObject(oldRecord.toString())
+                                            val destination=JSONObject((date.optJSONObject(newKey)?:JSONObject()).toString())
+                                            selected.forEach{number->if(oldRecord.has(number)){destination.put(number,oldRecord.optString(number));remaining.remove(number)}}
+                                            if(remaining.length()>0)date.put(oldKey,remaining) else date.remove(oldKey)
+                                            if(destination.length()>0)date.put(newKey,destination)
+                                        }
+                                    }
+                                    updatedAttendance.put(dateKey,date)
+                                }
+                                students=updatedStudents
+                                attendance=updatedAttendance
+                                prefs.edit().putString("attendance",updatedAttendance.toString()).apply()
+                                persist(updatedStudents)
+                                autoBackup(prefs,updatedStudents,columns,updatedAttendance,timetable,apiKey)
+                                if(selectedClass==classEditSource&&selected.any{it==students.firstOrNull{st->st.clazz==target&&st.studentNumber==it}?.studentNumber}) selectedClass=target
+                                snackbar="${selected.size} دانش‌آموز به «$target» منتقل شدند."
+                                showClassEditor=false
+                            }
+                        }){Text("ذخیره تغییرات")}
+                    },
+                    dismissButton={TextButton(onClick={showClassEditor=false}){Text("انصراف")}}
+                )
+            }
             if(editStudent!=null) AlertDialog(
                 onDismissRequest={editStudent=null},
                 title={Text("ویرایش دانش‌آموز")},
