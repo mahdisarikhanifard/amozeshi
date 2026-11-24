@@ -583,7 +583,7 @@ suspend fun generateLessonWithGroq(apiKey:String,request:String,mode:String="les
 اگر پایه یا نام درس یا مبحث مشخص نیست و از متن قابل تشخیص نیست، فقط یک سؤال کوتاه برای تکمیل همان مورد بپرس و طرح درس نساز. اگر منبع معتبر و منطبق پیدا نشد، فقط یک جمله کوتاه اعلام کن که متن دقیق کتاب تأیید نشد و سپس طرح درس عمومیِ محدود به اطلاعات قطعی درخواست ارائه بده؛ هیچ صفحه، تمرین، مثال یا عنوانی را جعل نکن.
 $task
 فقط خروجی خواسته‌شده را به فارسی بده. از مقدمه، جمع‌بندی، توضیح درباره هوش مصنوعی یا جستجو، منابع مفصل و توصیه‌های اضافه خودداری کن. اگر منبع دقیق پیدا شد، حداکثر یک ارجاع کوتاه در انتهای خروجی بیاور."""
-        val body=JSONObject().put("model","groq/compound")
+        val body=JSONObject().put("model","openai/gpt-oss-120b")
             .put("messages",JSONArray().put(JSONObject().put("role","system").put("content","دستیار پژوهش آموزشی و طراحی درس؛ جستجوی وب را انجام بده و از جعل منابع پرهیز کن.")).put(JSONObject().put("role","user").put("content",prompt)))
             .put("temperature",0.2).put("max_completion_tokens",2200)
         conn.outputStream.use{it.write(body.toString().toByteArray(Charsets.UTF_8))}
