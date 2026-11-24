@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 
 data class Student(val name:String, val clazz:String, val subject:String, val scores:Map<String,Float>, val studentNumber:String = "")
 data class ScoreColumn(val name:String, val max:Float=20f, val weight:Float=1f)
+data class BackupSnapshot(val students:List<Student>, val columns:List<ScoreColumn>, val attendance:JSONObject, val timetable:String)
 
 class MainActivity: ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { YarMoallemTheme { CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) { App() } } } }
@@ -73,6 +74,7 @@ class MainActivity: ComponentActivity() {
     var speechColumn by remember { mutableStateOf("") }
     var snackbar by remember { mutableStateOf("") }
     var restoreMessage by remember { mutableStateOf("") }
+    var pendingRestore by remember { mutableStateOf<BackupSnapshot?>(null) }
     var apiKey by remember { mutableStateOf(securePrefs.getString("api_key",null) ?: prefs.getString("api_key","") ?: "") }
     var showApiKey by remember { mutableStateOf(false) }
     var apiTestLoading by remember { mutableStateOf(false) }
@@ -95,28 +97,35 @@ class MainActivity: ComponentActivity() {
         }
     }
     val exportLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        if(uri!=null) try { ctx.contentResolver.openOutputStream(uri)?.use { it.write(makeBackup(students,columns,attendance,timetable,apiKey).toByteArray(Charsets.UTF_8)) }; snackbar="فایل پشتیبان ذخیره شد." } catch(e:Exception){snackbar="ذخیره پشتیبان ناموفق بود: ${e.message}"}
+        if(uri!=null) try {
+            val output=ctx.contentResolver.openOutputStream(uri) ?: error("فایل مقصد قابل نوشتن نیست")
+            output.use { stream ->
+                stream.write(makeBackup(students,columns,attendance,timetable).toByteArray(Charsets.UTF_8))
+                stream.flush()
+            }
+            restoreMessage="فایل پشتیبان ذخیره شد."
+        } catch(e:Exception) {
+            restoreMessage="ذخیره پشتیبان ناموفق بود؛ فایل کامل نوشته نشد. "+(e.message ?: "خطای نامشخص")
+        }
     }
     val importLauncher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if(uri!=null) try {
             val raw=ctx.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use{it.readText()} ?: error("فایل قابل خواندن نیست")
-            val root=JSONObject(raw)
-            require(root.optString("app")=="YarMoallem") {"فایل پشتیبان یار معلم نیست"}
-            val newStudents=loadStudents(root.getJSONArray("students").toString())
-            val newColumns=loadColumns(root.getJSONArray("columns").toString())
-            val newAttendance=root.optJSONObject("attendance") ?: JSONObject()
-            val newTimetable=root.optString("timetable","")
-            students=newStudents;columns=newColumns;attendance=newAttendance;timetable=newTimetable;timetableEdit=newTimetable;apiKey=root.optString("apiKey",apiKey)
-            selectedClass=newStudents.firstOrNull()?.clazz ?: "";selectedSubject=newStudents.firstOrNull { it.clazz==selectedClass }?.subject ?: ""
-            restoreMessage="بازیابی کامل شد؛ ${newStudents.size} دانش‌آموز بازیابی شد."
-            securePrefs.edit().putString("api_key",apiKey).apply()
-            prefs.edit().putString("students",saveStudents(newStudents)).putString("columns",saveColumns(newColumns)).putString("attendance",newAttendance.toString()).putString("timetable",newTimetable).remove("api_key").apply()
-            autoBackup(prefs,newStudents,newColumns,newAttendance,newTimetable,apiKey)
-
-        } catch(e:Exception){restoreMessage="بازیابی انجام نشد؛ اطلاعات قبلی حفظ شد. ${e.message}"}
+            val backup=parseBackup(raw)
+            pendingRestore=backup
+            restoreMessage="فایل پشتیبان معتبر است؛ برای جایگزینی اطلاعات، تأیید کنید."
+        } catch(e:Exception) {
+            pendingRestore=null
+            restoreMessage="فایل پشتیبان نامعتبر است؛ اطلاعات فعلی حفظ شد. "+(e.message ?: "ساختار فایل صحیح نیست")
+        }
     }
     var lessonLoading by remember { mutableStateOf(false) }
-    fun persist(studentData:List<Student> = students, columnData:List<ScoreColumn> = columns) { prefs.edit().putString("students",saveStudents(studentData)).putString("columns",saveColumns(columnData)).apply(); autoBackup(prefs,studentData,columnData,attendance,timetable,apiKey) }
+    fun persist(studentData:List<Student> = students, columnData:List<ScoreColumn> = columns):Boolean {
+        val saved=try { prefs.edit().putString("students",saveStudents(studentData)).putString("columns",saveColumns(columnData)).commit() } catch(_:Exception) { false }
+        if(saved) autoBackup(prefs,studentData,columnData,attendance,timetable,apiKey)
+        else snackbar="ذخیره اطلاعات ناموفق بود؛ فضای ذخیره‌سازی دستگاه را بررسی کنید."
+        return saved
+    }
     val speechLauncher=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val spoken=result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty()
         speechText=spoken
